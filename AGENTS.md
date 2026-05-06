@@ -1,12 +1,8 @@
 # Agents entry point
 
-- **What this project is:** `comfy-diffusion` is a standalone Python library that exposes ComfyUI's inference engine (`comfy.*` modules) as importable Python modules — no server, no node graph, no UI layer. It is consumed exactly like `diffusers` or `DiffSynth-Studio`: `import comfy_diffusion` and run inference directly in your own code. ComfyUI is vendored as a git submodule at `vendor/ComfyUI` and its internal modules are made importable transparently on `import comfy_diffusion`. The library is designed to be a single `pip`/`uv` dependency that any Python application (FastAPI backend, script, pipeline) can add without operating a separate ComfyUI server.
+- **What this project is:** `comfy-diffusion` is a standalone Python library that exposes ComfyUI's inference engine (`comfy.*` modules) as importable Python modules — no server, no node graph, no UI layer. It is consumed exactly like `diffusers` or `DiffSynth-Studio`: `import comfy_diffusion` and run inference directly in your own code. ComfyUI is vendored as a git submodule at `vendor/ComfyUI` and its internal modules are made importable by runtime APIs when needed. The library is designed to be a single `pip`/`uv` dependency that any Python application (FastAPI backend, script, pipeline) can add without operating a separate ComfyUI server.
 
-- **How to work here:** Use this file as the single entry point. Follow the process phases in order; read and update `.agents/state.json` for the current iteration and phase. Invoke the skills under `.agents/skills/` as indicated by each NVST command. All iteration artifacts live in `.agents/flow/` with the naming `it_` + 6-digit iteration number (e.g. `it_000001_product-requirement-document.md`). From the second iteration onward, adhere to [`.agents/PROJECT_CONTEXT.md`](.agents/PROJECT_CONTEXT.md). **Python:** use [uv](https://docs.astral.sh/uv/) for all install, run, and dependency commands (`uv sync`, `uv run`, `uv add`) — never use `pip` or `venv` directly. **NVST:** run all agent/workflow commands with [Bun](https://bun.sh) as `bun nvst <command>` (see `docs/nvst-flow/`).
-
-- **Process:** Define → Prototype → Refactor (see `docs/nvst-flow/` or package documentation).
-
-- **Project context:** [`.agents/PROJECT_CONTEXT.md`](.agents/PROJECT_CONTEXT.md) — conventions, architecture decisions, and modular structure; the agent adheres from the second iteration onward.
+- **How to work here:** Use this file as the single entry point. The repo is now a Python package plus the small `comfy-diffusion` CLI; do not add server, MCP, frontend, daemon, service manager, installer, or standalone-binary layers unless explicitly requested. **Python:** use [uv](https://docs.astral.sh/uv/) for all install, run, and dependency commands (`uv sync`, `uv run`, `uv add`) — never use `pip` or `venv` directly.
 
 - **Roadmap and node inventory:** [`ROADMAP.md`](ROADMAP.md) — full iteration plan, node classification (Roadmap / Nice-to-have / Discarded), and optional dependency schema.
 
@@ -24,6 +20,8 @@
   - Inference mode ownership: `torch.inference_mode()` is enforced centrally in core execution APIs (`sampling.py`, `vae.py`, and relevant `audio.py` wrappers). Pipeline authors must not duplicate inference-mode wrappers in each `run()` implementation.
   - `path` type annotation: `str | Path` is the established pattern across `ModelManager`, `load_checkpoint`, and `apply_lora`. Do not change to `str | os.PathLike` unless updating all occurrences simultaneously in a dedicated cleanup iteration.
   - No high-level pipeline abstraction: comfy-diffusion is a modular runtime library. There is no `ImagePipeline` or equivalent. Callers compose the building blocks directly. This is intentional — the modularity is the feature.
+  - CLI scope: `comfy-diffusion` is operational tooling for runtime diagnostics, path inspection, model listing, and manifest-based model downloads only.
+  - Removed application layers must stay removed: no Parallax CLI, no FastAPI server, no MCP server, no web frontend, no async job queue, no service manager, no PyInstaller binary release flow.
   - External libraries over node ports: prefer `Pillow`, `numpy`, `opencv-python`, `torchaudio` for image transforms, mask ops, video I/O, and audio I/O respectively. Only wrap comfy nodes when they provide non-trivial logic (VAE, samplers, model patches, conditioning). See ROADMAP.md for the full classification.
 
 - **Rule:** All generated resources in this repo must be in English.

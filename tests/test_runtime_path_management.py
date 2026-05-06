@@ -31,11 +31,12 @@ def _run_python(code: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_importing_comfy_diffusion_makes_comfy_internals_discoverable() -> None:
+def test_runtime_bootstrap_makes_comfy_internals_discoverable() -> None:
     result = _run_python(
         (
             "import importlib.util\n"
-            "import comfy_diffusion\n"
+            "from comfy_diffusion._runtime import ensure_comfyui_on_path\n"
+            "ensure_comfyui_on_path()\n"
             "spec = importlib.util.find_spec('comfy.model_management')\n"
             "assert spec is not None\n"
         ),
@@ -51,9 +52,13 @@ def test_path_insertion_is_minimal_and_not_duplicated() -> None:
             "import importlib\n"
             "import json\n"
             "import comfy_diffusion\n"
+            "from comfy_diffusion._runtime import ensure_comfyui_on_path\n"
             "import sys\n"
-            "expected = str(Path(comfy_diffusion.__file__).resolve().parent.parent / 'vendor' / 'ComfyUI')\n"
+            "package_root = Path(comfy_diffusion.__file__).resolve().parent.parent\n"
+            "expected = str(package_root / 'vendor' / 'ComfyUI')\n"
+            "ensure_comfyui_on_path()\n"
             "importlib.reload(comfy_diffusion)\n"
+            "ensure_comfyui_on_path()\n"
             "matches = [p for p in sys.path if p == expected]\n"
             "vendor_entries = [p for p in sys.path if '/vendor/' in p.replace('\\\\\\\\', '/')]\n"
             "print(json.dumps({'expected': expected, 'matches': len(matches),"
@@ -74,9 +79,11 @@ def test_import_works_from_any_working_directory(tmp_path: Path) -> None:
             "from pathlib import Path\n"
             "import json\n"
             "import comfy_diffusion\n"
+            "from comfy_diffusion._runtime import ensure_comfyui_on_path\n"
             "import sys\n"
             "comfyui_path = str("
             "Path(comfy_diffusion.__file__).resolve().parent.parent / 'vendor' / 'ComfyUI')\n"
+            "ensure_comfyui_on_path()\n"
             "print(json.dumps({'cwd': str(Path.cwd()), 'comfyui_path': comfyui_path,"
             " 'on_path': comfyui_path in sys.path}))\n"
         ),

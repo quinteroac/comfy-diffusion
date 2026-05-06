@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import comfy_diffusion
@@ -24,3 +25,28 @@ def test_package_uses_src_less_layout() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     assert (repo_root / "comfy_diffusion").is_dir()
     assert not (repo_root / "src" / "comfy_diffusion").exists()
+
+
+def test_only_comfy_diffusion_package_is_discovered() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == [
+        "comfy_diffusion*"
+    ]
+
+
+def test_comfy_diffusion_is_the_only_console_script() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["scripts"] == {
+        "comfy-diffusion": "comfy_diffusion.cli.main:app"
+    }
+
+
+def test_removed_application_layers_are_absent() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+
+    for path in ("cli", "server", "mcp", "frontend", "parallax"):
+        assert not (repo_root / path).exists()

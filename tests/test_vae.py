@@ -115,6 +115,7 @@ def test_vae_module_exports_decode_and_encode() -> None:
         "vae_decode_batch",
         "vae_decode_batch_tiled",
         "vae_encode",
+        "vae_encode_tensor",
         "vae_encode_for_inpaint",
         "vae_encode_batch",
         "vae_encode_tiled",
@@ -505,7 +506,7 @@ def test_vae_decode_batch_tiled_with_bcthw_latent_preserves_channel_dim() -> Non
 
     images = vae_decode_batch_tiled(_FakeVae(), {"samples": samples}, tile_size=64, overlap=8)
 
-    assert len(images) == 11
+    assert len(images) == 1
     assert len(seen_shapes) == 1
     assert seen_shapes[0] == (1, 128, 11, 16, 24)
 

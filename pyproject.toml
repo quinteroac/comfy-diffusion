@@ -19,61 +19,87 @@ classifiers = [
 ]
 urls = { Homepage = "https://github.com/quinteroac/comfy-diffusion", Repository = "https://github.com/quinteroac/comfy-diffusion", Issues = "https://github.com/quinteroac/comfy-diffusion/issues" }
 dependencies = [
-    "aiohttp>=3.11.8",
-    "aiosqlite>=0.22.1",
-    "alembic>=1.18.4",
-    "av>=14.2.0",
-    "blake3",
-    "comfy-aimdo>=0.2.12",
-    "comfy-kitchen>=0.2.8",
-    "comfyui-embedded-docs==0.4.3",
-    "comfyui-frontend-package==1.41.21",
-    "comfyui-workflow-templates==0.9.26",
     "einops>=0.8.2",
-    "fastapi>=0.135.3",
-    "fastmcp>=3.2.0",
-    "glfw>=2.10.0",
-    "httpx[http2]>=0.28.1",
     "huggingface_hub>=0.20",
-    "imageio>=2.37.2",
-    "kornia>=0.7.1",
     "numpy>=1.25.0",
-    "opencv-python>=4.13.0.92",
     "pillow>=12.1.1",
-    "psutil>=7.2.2",
-    "pydantic~=2.0",
-    "pydantic-settings~=2.0",
-    "pyopengl>=3.1.10",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
-    "rich>=13.0",
     "safetensors>=0.4.2",
     "scipy>=1.17.1",
     "sentencepiece>=0.2.1",
     "simpleeval>=1.0.0",
-    "spandrel>=0.4.2",
-    "sqlalchemy>=2.0.48",
     "tokenizers>=0.13.3",
-    "torch>=2.10.0",
-    "torchaudio>=2.10.0",
-    "torchsde>=0.2.6",
-    "torchvision>=0.25.0",
     "tqdm>=4.67.3",
     "transformers>=4.50.3",
     "typer>=0.24.1",
     "yarl>=1.18.0",
 ]
 
+[project.optional-dependencies]
+cpu = [
+    "torch",
+    "torchvision",
+]
+cuda = [
+    "torch",
+    "torchvision",
+]
+audio = [
+    "torchaudio",
+]
+video = [
+    "av>=14.2.0",
+    "imageio>=2.37.2",
+    "opencv-python>=4.13.0.92",
+]
+comfyui = [
+    "aiohttp>=3.11.8",
+    "blake3",
+    "comfy-aimdo>=0.2.12",
+    "comfy-kitchen>=0.2.8",
+    "comfyui-embedded-docs==0.4.3",
+    "comfyui-workflow-templates==0.9.26",
+    "glfw>=2.10.0",
+    "httpx[http2]>=0.28.1",
+    "kornia>=0.7.1",
+    "psutil>=7.2.2",
+    "pydantic~=2.0",
+    "pyopengl>=3.1.10",
+    "spandrel>=0.4.2",
+    "torchsde>=0.2.6",
+]
+all = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "av>=14.2.0",
+    "imageio>=2.37.2",
+    "opencv-python>=4.13.0.92",
+    "aiohttp>=3.11.8",
+    "blake3",
+    "comfy-aimdo>=0.2.12",
+    "comfy-kitchen>=0.2.8",
+    "comfyui-embedded-docs==0.4.3",
+    "comfyui-workflow-templates==0.9.26",
+    "glfw>=2.10.0",
+    "httpx[http2]>=0.28.1",
+    "kornia>=0.7.1",
+    "psutil>=7.2.2",
+    "pydantic~=2.0",
+    "pyopengl>=3.1.10",
+    "spandrel>=0.4.2",
+    "torchsde>=0.2.6",
+]
+
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "aiosqlite>=0.22.1"]
-cli-build = ["pyinstaller>=6.0"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
 
 [project.scripts]
-parallax = "cli.main:app"
-parallax-mcp = "mcp.main:main"
+comfy-diffusion = "comfy_diffusion.cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["comfy_diffusion*", "cli*", "parallax*", "mcp*", "server*"]
+include = ["comfy_diffusion*"]
 
 [tool.setuptools.package-data]
 comfy_diffusion = [
@@ -86,14 +112,22 @@ comfy_diffusion = [
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cuda", marker = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu'" },
+  { index = "pytorch-cuda", marker = "extra != 'cpu' and extra == 'cuda'" },
 ]
 torchvision = [
-  { index = "pytorch-cuda", marker = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu'" },
+  { index = "pytorch-cuda", marker = "extra != 'cpu' and extra == 'cuda'" },
 ]
 torchaudio = [
-  { index = "pytorch-cuda", marker = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu'" },
+  { index = "pytorch-cuda", marker = "extra != 'cpu' and extra == 'cuda'" },
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cuda"

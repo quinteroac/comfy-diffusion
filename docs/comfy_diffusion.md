@@ -2,9 +2,9 @@
 
 Python library that exposes ComfyUI's inference engine as importable modules — no server, no node graph, no UI.
 
-## Role in the monorepo
+## Role
 
-Core inference layer. All other packages depend on this indirectly through `server/`. It is also published independently to PyPI as `comfy-diffusion`.
+Core Python package for direct ComfyUI-backed inference. This repository is centered on the package plus the small `comfy-diffusion` CLI.
 
 ## Location
 
@@ -38,7 +38,7 @@ uv sync --extra cuda --extra comfyui
 | `comfy_diffusion.textgen` | `generate_text()`, `generate_ltx2_prompt()` |
 | `comfy_diffusion.video` | model sampling patches, video CFG guidance |
 | `comfy_diffusion.downloader` | `download_models()`, `HFModelEntry`, `CivitAIModelEntry`, `URLModelEntry` |
-| `comfy_diffusion.pipelines.*` | ready-made pipelines (e.g. `ltx2_t2v`) |
+| `comfy_diffusion.pipelines.*` | optional ready-made helpers |
 
 ## Usage
 
@@ -73,5 +73,5 @@ uv run pytest
 
 - `torch` (optional via `[cpu]` / `[cuda]` extras)
 - `ComfyUI` vendored at `vendor/ComfyUI`
-- `pillow`, `psutil` (core)
-- `huggingface_hub`, `tqdm` (optional via `[downloader]`)
+- `pillow`, `numpy`, `huggingface_hub`, `tqdm` (core package support)
+- `torchaudio`, `opencv-python`, `imageio`, `av` through optional audio/video extras

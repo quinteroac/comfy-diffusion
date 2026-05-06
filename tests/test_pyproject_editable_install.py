@@ -63,9 +63,9 @@ def test_core_dependencies_are_declared_and_torch_is_optional_only() -> None:
     optional = pyproject["project"]["optional-dependencies"]
 
     assert dependencies
-    assert all(not dependency.startswith("torch") for dependency in dependencies)
-    assert optional["cpu"] == ["torch"]
-    assert optional["cuda"] == ["torch"]
+    assert "torch" not in {_dependency_name(dependency) for dependency in dependencies}
+    assert optional["cpu"] == ["torch", "torchvision"]
+    assert optional["cuda"] == ["torch", "torchvision"]
 
 
 def test_torch_optional_dependencies_are_not_version_pinned() -> None:
@@ -74,7 +74,7 @@ def test_torch_optional_dependencies_are_not_version_pinned() -> None:
 
     for extra in ("cpu", "cuda"):
         for dependency in optional[extra]:
-            assert dependency == "torch"
+            assert dependency in {"torch", "torchvision"}
             assert "==" not in dependency
             assert ">=" not in dependency
             assert "<=" not in dependency
@@ -96,7 +96,11 @@ def test_video_optional_dependencies_are_declared_in_video_extra() -> None:
     optional = pyproject["project"]["optional-dependencies"]
 
     assert "video" in optional
-    assert optional["video"] == ["opencv-python>=4.13.0.92", "imageio>=2.37.2"]
+    assert optional["video"] == [
+        "av>=14.2.0",
+        "imageio>=2.37.2",
+        "opencv-python>=4.13.0.92",
+    ]
 
 
 def test_video_dependencies_are_not_in_core_dependencies() -> None:
@@ -120,7 +124,7 @@ def test_all_extra_is_union_of_cpu_cuda_video_and_audio_dependencies() -> None:
     optional = pyproject["project"]["optional-dependencies"]
 
     expected_union = set()
-    for extra in ("cpu", "cuda", "video", "audio"):
+    for extra in ("cuda", "video", "audio", "comfyui"):
         expected_union.update(optional[extra])
 
     assert "all" in optional
