@@ -9,7 +9,7 @@
 - **Key architecture decisions (do not revisit without explicit instruction):**
   - ComfyUI is vendored at `vendor/ComfyUI` as a git submodule pinned to a stable release tag — never floating on `master`. Update the pin deliberately between iterations only.
   - `sys.path` manipulation is encapsulated entirely inside `comfy_diffusion/_runtime.py` — consumers never touch paths manually. Use absolute paths derived from `__file__`.
-  - The node system (`nodes.py`, custom nodes) is never loaded — comfy-diffusion imports `comfy.*` modules directly only.
+  - The node system is loaded only through the explicit experimental `comfy_diffusion.nodes` escape hatch. Default node discovery may load ComfyUI core and built-in extra nodes; API nodes require opt-in; external custom nodes are loaded only from explicit trusted paths and are never discovered by scanning ComfyUI's default `custom_nodes` folder.
   - `torch` is an optional dependency declared as extras (`comfy-diffusion[cuda]` / `comfy-diffusion[cpu]`) — never hardcode a torch version or index URL in core dependencies.
   - `check_runtime()` returns an error dict (never raises) when the ComfyUI submodule is not initialized. `python_version` is always populated regardless.
   - All tests must pass on CPU-only environments — CI has no GPU. GPU is validated locally before merging.
@@ -20,7 +20,7 @@
   - Inference mode ownership: `torch.inference_mode()` is enforced centrally in core execution APIs (`sampling.py`, `vae.py`, and relevant `audio.py` wrappers). Pipeline authors must not duplicate inference-mode wrappers in each `run()` implementation.
   - `path` type annotation: `str | Path` is the established pattern across `ModelManager`, `load_checkpoint`, and `apply_lora`. Do not change to `str | os.PathLike` unless updating all occurrences simultaneously in a dedicated cleanup iteration.
   - No high-level pipeline abstraction: comfy-diffusion is a modular runtime library. There is no `ImagePipeline` or equivalent. Callers compose the building blocks directly. This is intentional — the modularity is the feature.
-  - CLI scope: `comfy-diffusion` is operational tooling for runtime diagnostics, path inspection, model listing, and manifest-based model downloads only.
+  - CLI scope: `comfy-diffusion` is operational tooling for runtime diagnostics, path inspection, model listing, manifest-based model downloads, raw node inspection, and trusted custom-node Git installs only.
   - Removed application layers must stay removed: no Parallax CLI, no FastAPI server, no MCP server, no web frontend, no async job queue, no service manager, no PyInstaller binary release flow.
   - External libraries over node ports: prefer `Pillow`, `numpy`, `opencv-python`, `torchaudio` for image transforms, mask ops, video I/O, and audio I/O respectively. Only wrap comfy nodes when they provide non-trivial logic (VAE, samplers, model patches, conditioning). See ROADMAP.md for the full classification.
 

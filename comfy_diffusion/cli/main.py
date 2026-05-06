@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
+import click
 import typer
 
 from comfy_diffusion._runtime import COMFYUI_PINNED_TAG, _comfyui_root
@@ -25,9 +27,11 @@ app = typer.Typer(
 )
 runtime_app = typer.Typer(help="Inspect the local ComfyUI runtime.", no_args_is_help=True)
 models_app = typer.Typer(help="Inspect and download model files.", no_args_is_help=True)
+nodes_app = typer.Typer(help="Inspect raw ComfyUI nodes.", no_args_is_help=True)
 
 app.add_typer(runtime_app, name="runtime")
 app.add_typer(models_app, name="models")
+app.add_typer(nodes_app, name="nodes")
 
 _MODEL_DIRS = (
     "checkpoints",
@@ -50,12 +54,30 @@ def _echo_json(payload: Any) -> None:
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _jsonable(value: Any) -> Any:
+    if is_dataclass(value) and not isinstance(value, type):
+        return _jsonable(asdict(value))
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return repr(value)
+
+
 def _package_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
 def _default_models_dir() -> Path:
     return Path.home() / ".cache" / "comfy-diffusion" / "models"
+
+
+def _custom_node_paths(custom_node: list[Path] | None) -> list[Path]:
+    return custom_node or []
 
 
 @runtime_app.command("check")
@@ -233,6 +255,173 @@ def models_list(
         typer.echo(f"{dirname}: {len(files)} file(s)")
         for file_path in files:
             typer.echo(f"  {file_path}")
+
+
+@nodes_app.command("list")
+def nodes_list(
+    include_api: Annotated[
+        bool,
+        typer.Option("--include-api", help="Include built-in ComfyUI API nodes."),
+    ] = False,
+    custom_node: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--custom-node",
+            help="Explicit custom node .py file or package directory to load.",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON."),
+    ] = False,
+) -> None:
+    """List raw ComfyUI nodes, optionally including explicit custom node paths."""
+    from comfy_diffusion.nodes import list_nodes
+
+    try:
+        nodes = list_nodes(
+            include_api=include_api,
+            custom_node_paths=_custom_node_paths(custom_node),
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        _echo_json(
+            {
+                "include_api": include_api,
+                "custom_nodes": [str(path) for path in _custom_node_paths(custom_node)],
+                "nodes": {node_id: _jsonable(info) for node_id, info in nodes.items()},
+            }
+        )
+        return
+
+    for node_id, info in nodes.items():
+        suffix = " [api]" if info.is_api_node else ""
+        if info.is_custom_node:
+            suffix += " [custom]"
+        typer.echo(f"{node_id}{suffix}: {info.class_name}")
+
+
+@nodes_app.command("show")
+def nodes_show(
+    node_id: Annotated[str, typer.Argument(help="ComfyUI node id to inspect.")],
+    include_api: Annotated[
+        bool,
+        typer.Option("--include-api", help="Include built-in ComfyUI API nodes."),
+    ] = False,
+    custom_node: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--custom-node",
+            help="Explicit custom node .py file or package directory to load.",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON."),
+    ] = False,
+) -> None:
+    """Show metadata for one raw ComfyUI node."""
+    from comfy_diffusion.nodes import get_node_info
+
+    try:
+        info = get_node_info(
+            node_id,
+            include_api=include_api,
+            custom_node_paths=_custom_node_paths(custom_node),
+        )
+    except KeyError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    payload = _jsonable(info)
+    if json_output:
+        _echo_json(payload)
+        return
+
+    for key, value in payload.items():
+        typer.echo(f"{key}: {value}")
+
+
+@nodes_app.command("install")
+def nodes_install(
+    repo_url: Annotated[str, typer.Argument(help="Git repository URL to install.")],
+    ref: Annotated[
+        str | None,
+        typer.Option("--ref", help="Branch, tag, or commit to checkout after fetching."),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Install directory name. Defaults to repo name."),
+    ] = None,
+    custom_nodes_dir: Annotated[
+        Path | None,
+        typer.Option("--custom-nodes-dir", help="Directory for installed custom nodes."),
+    ] = None,
+    install_deps: Annotated[
+        bool,
+        typer.Option("--install-deps", help="Install requirements.txt with uv pip."),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON."),
+    ] = False,
+) -> None:
+    """Install or update a trusted custom node Git repository."""
+    from comfy_diffusion.custom_nodes import install_custom_node
+
+    try:
+        result = install_custom_node(
+            repo_url,
+            ref=ref,
+            name=name,
+            custom_nodes_dir=custom_nodes_dir,
+            install_deps=install_deps,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    payload = _jsonable(result)
+    if json_output:
+        _echo_json(payload)
+        return
+
+    typer.echo(f"name: {result.name}")
+    typer.echo(f"path: {result.path}")
+    typer.echo(f"commit: {result.commit}")
+    typer.echo(f"installed: {result.installed}")
+    typer.echo(f"updated: {result.updated}")
+    if result.requirements_path is not None:
+        typer.echo(f"requirements: {result.requirements_path}")
+        if result.dependencies_installed:
+            typer.echo("dependencies: installed")
+        elif result.dependency_command is not None:
+            typer.echo(f"dependencies: run {' '.join(result.dependency_command)}")
+
+
+@nodes_app.command("installed")
+def nodes_installed(
+    custom_nodes_dir: Annotated[
+        Path | None,
+        typer.Option("--custom-nodes-dir", help="Directory for installed custom nodes."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON."),
+    ] = False,
+) -> None:
+    """List custom node repositories installed by comfy-diffusion."""
+    from comfy_diffusion.custom_nodes import list_installed_custom_nodes
+
+    installed = list_installed_custom_nodes(custom_nodes_dir=custom_nodes_dir)
+    if json_output:
+        _echo_json({"custom_nodes": [_jsonable(item) for item in installed]})
+        return
+
+    for item in installed:
+        suffix = " [requirements]" if item.has_requirements else ""
+        typer.echo(f"{item.name}{suffix}: {item.path}")
 
 
 def main() -> None:

@@ -21,6 +21,11 @@ def test_check_runtime_is_public_symbol() -> None:
     assert "check_runtime" in comfy_diffusion.__all__
 
 
+def test_raw_node_api_is_explicit_submodule_only() -> None:
+    assert "list_nodes" not in comfy_diffusion.__all__
+    assert not hasattr(comfy_diffusion, "list_nodes")
+
+
 def test_package_uses_src_less_layout() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     assert (repo_root / "comfy_diffusion").is_dir()
