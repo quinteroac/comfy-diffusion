@@ -363,7 +363,7 @@ wheels = [
 
 [[package]]
 name = "comfy-diffusion"
-version = "1.4.0"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "einops" },
