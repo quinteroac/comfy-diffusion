@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,7 +25,9 @@ def _install_fake_ltxv_audio_vae_loader_modules(
         "add_model_folder_path": [],
         "get_full_path_or_raise": [],
         "load_torch_file": [],
-        "AudioVAE": [],
+        "state_dict_prefix_replace": [],
+        "VAE": [],
+        "throw_exception_if_invalid": [],
     }
 
     folder_paths_module = ModuleType("folder_paths")
@@ -50,33 +53,40 @@ def _install_fake_ltxv_audio_vae_loader_modules(
         return state_dict, metadata
 
     setattr(comfy_utils_module, "load_torch_file", load_torch_file)
+    remapped_state_dict = {"autoencoder.encoder.weight": object(), "vocoder.weight": object()}
 
-    audio_vae_module = ModuleType("comfy.ldm.lightricks.vae.audio_vae")
+    def state_dict_prefix_replace(
+        sd: dict[str, Any],
+        replace_prefix: dict[str, str],
+        *,
+        filter_keys: bool,
+    ) -> dict[str, Any]:
+        calls["state_dict_prefix_replace"].append((sd, replace_prefix, filter_keys))
+        return remapped_state_dict
 
-    def AudioVAE(sd: dict[str, Any], model_metadata: dict[str, Any] | None) -> Any:
-        calls["AudioVAE"].append((sd, model_metadata))
+    setattr(comfy_utils_module, "state_dict_prefix_replace", state_dict_prefix_replace)
+
+    comfy_sd_module = ModuleType("comfy.sd")
+
+    def throw_exception_if_invalid() -> None:
+        calls["throw_exception_if_invalid"].append(())
+
+    def make_vae(*, sd: dict[str, Any], metadata: dict[str, Any] | None) -> Any:
+        calls["VAE"].append((sd, metadata))
+        audio_vae_object.throw_exception_if_invalid.side_effect = throw_exception_if_invalid
         return audio_vae_object
 
-    setattr(audio_vae_module, "AudioVAE", AudioVAE)
+    setattr(comfy_sd_module, "VAE", make_vae)
 
     comfy_module = ModuleType("comfy")
-    comfy_ldm_module = ModuleType("comfy.ldm")
-    comfy_lightricks_module = ModuleType("comfy.ldm.lightricks")
-    comfy_lightricks_vae_module = ModuleType("comfy.ldm.lightricks.vae")
 
     setattr(comfy_module, "utils", comfy_utils_module)
-    setattr(comfy_module, "ldm", comfy_ldm_module)
-    setattr(comfy_ldm_module, "lightricks", comfy_lightricks_module)
-    setattr(comfy_lightricks_module, "vae", comfy_lightricks_vae_module)
-    setattr(comfy_lightricks_vae_module, "audio_vae", audio_vae_module)
+    setattr(comfy_module, "sd", comfy_sd_module)
 
     monkeypatch.setitem(sys.modules, "folder_paths", folder_paths_module)
     monkeypatch.setitem(sys.modules, "comfy", comfy_module)
     monkeypatch.setitem(sys.modules, "comfy.utils", comfy_utils_module)
-    monkeypatch.setitem(sys.modules, "comfy.ldm", comfy_ldm_module)
-    monkeypatch.setitem(sys.modules, "comfy.ldm.lightricks", comfy_lightricks_module)
-    monkeypatch.setitem(sys.modules, "comfy.ldm.lightricks.vae", comfy_lightricks_vae_module)
-    monkeypatch.setitem(sys.modules, "comfy.ldm.lightricks.vae.audio_vae", audio_vae_module)
+    monkeypatch.setitem(sys.modules, "comfy.sd", comfy_sd_module)
 
     return calls
 
@@ -97,7 +107,7 @@ def test_load_ltxv_audio_vae_calls_loader_and_returns_raw_object(
 
     fake_state_dict = {"audio_vae.encoder.weight": object()}
     fake_metadata = {"format": "safetensors"}
-    fake_audio_vae = object()
+    fake_audio_vae = MagicMock()
 
     calls = _install_fake_ltxv_audio_vae_loader_modules(
         monkeypatch,
@@ -113,7 +123,18 @@ def test_load_ltxv_audio_vae_calls_loader_and_returns_raw_object(
     assert result is fake_audio_vae
     assert calls["get_full_path_or_raise"] == []
     assert calls["load_torch_file"] == [(str(audio_vae_file.resolve()), True)]
-    assert calls["AudioVAE"] == [(fake_state_dict, fake_metadata)]
+    assert calls["state_dict_prefix_replace"] == [
+        (
+            fake_state_dict,
+            {"audio_vae.": "autoencoder.", "vocoder.": "vocoder."},
+            True,
+        )
+    ]
+    assert len(calls["VAE"]) == 1
+    assert calls["VAE"][0][0] is not fake_state_dict
+    assert set(calls["VAE"][0][0]) == {"autoencoder.encoder.weight", "vocoder.weight"}
+    assert calls["VAE"][0][1] == fake_metadata
+    assert calls["throw_exception_if_invalid"] == [()]
     assert calls["add_model_folder_path"] == [
         ("checkpoints", str(checkpoints_dir), True),
         ("embeddings", str(embeddings_dir), True),
@@ -138,7 +159,7 @@ def test_load_ltxv_audio_vae_is_callable_from_models_import(
     (models_dir / "embeddings").mkdir(parents=True)
 
     expected_resolved = str((models_dir / "checkpoints" / "audio_vae.safetensors").resolve())
-    fake_audio_vae = object()
+    fake_audio_vae = MagicMock()
     calls = _install_fake_ltxv_audio_vae_loader_modules(
         monkeypatch,
         state_dict={"weights": object()},
@@ -167,7 +188,7 @@ def test_load_ltxv_audio_vae_raises_file_not_found_before_loader(
         monkeypatch,
         state_dict={},
         metadata=None,
-        audio_vae_object=object(),
+        audio_vae_object=MagicMock(),
         resolved_checkpoint_path="/unused/path.safetensors",
     )
 
@@ -180,4 +201,4 @@ def test_load_ltxv_audio_vae_raises_file_not_found_before_loader(
     assert expected_path in str(exc_info.value)
     assert calls["get_full_path_or_raise"] == []
     assert calls["load_torch_file"] == []
-    assert calls["AudioVAE"] == []
+    assert calls["VAE"] == []

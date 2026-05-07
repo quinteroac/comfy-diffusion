@@ -259,8 +259,8 @@ class ModelManager:
         ensure_comfyui_on_path()
 
         import folder_paths
+        from comfy import sd as comfy_sd
         from comfy import utils as comfy_utils
-        from comfy.ldm.lightricks.vae.audio_vae import AudioVAE
 
         p = Path(path)
         if p.is_absolute() and p.is_file():
@@ -274,7 +274,14 @@ class ModelManager:
         state_dict, metadata = comfy_utils.load_torch_file(
             checkpoint_path, return_metadata=True
         )
-        return AudioVAE(state_dict, metadata)
+        state_dict = comfy_utils.state_dict_prefix_replace(
+            state_dict,
+            {"audio_vae.": "autoencoder.", "vocoder.": "vocoder."},
+            filter_keys=True,
+        )
+        vae = comfy_sd.VAE(sd=state_dict, metadata=metadata)
+        vae.throw_exception_if_invalid()
+        return vae
 
     def load_ltxav_text_encoder(
         self,

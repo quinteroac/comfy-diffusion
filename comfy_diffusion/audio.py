@@ -120,6 +120,37 @@ def ltxv_audio_vae_decode(vae: _LtxvAudioVaeDecoder, latent: Any) -> dict[str, A
     if getattr(latent_tensor, "is_nested", False):
         latent_tensor = latent_tensor.unbind()[-1]
 
+    first_stage_model = getattr(vae, "first_stage_model", None)
+    if first_stage_model is not None:
+        if hasattr(vae, "patcher"):
+            from ._runtime import ensure_comfyui_on_path
+
+            ensure_comfyui_on_path()
+            import comfy.model_management
+
+            memory_required = 0
+            if hasattr(vae, "memory_used_decode") and hasattr(latent_tensor, "shape"):
+                memory_required = vae.memory_used_decode(latent_tensor.shape, vae.vae_dtype)
+            comfy.model_management.load_models_gpu(
+                [vae.patcher],
+                memory_required=memory_required,
+                force_full_load=getattr(vae, "disable_offload", False),
+            )
+        if hasattr(latent_tensor, "to") and hasattr(vae, "device") and hasattr(vae, "vae_dtype"):
+            latent_tensor = latent_tensor.to(device=vae.device, dtype=vae.vae_dtype)
+        with _inference_mode_context():
+            audio = first_stage_model.decode(latent_tensor)
+        if hasattr(audio, "to"):
+            output_device = getattr(vae, "output_device", getattr(latent_tensor, "device", None))
+            if hasattr(vae, "vae_output_dtype"):
+                audio = audio.to(device=output_device, dtype=vae.vae_output_dtype(), copy=True)
+            elif output_device is not None:
+                audio = audio.to(output_device)
+        return {
+            "waveform": audio,
+            "sample_rate": int(first_stage_model.output_sample_rate),
+        }
+
     if hasattr(vae, "to"):
         vae.to("cpu")
     if hasattr(latent_tensor, "cpu"):
