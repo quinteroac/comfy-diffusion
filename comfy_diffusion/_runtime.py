@@ -13,9 +13,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-COMFYUI_PINNED_TAG = "v0.18.3"
+COMFYUI_PINNED_TAG = "v0.20.2"
 COMFYUI_PINNED_ARCHIVE_URL = (
-    "https://github.com/comfyanonymous/ComfyUI/archive/refs/tags/"
+    "https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/"
     f"{COMFYUI_PINNED_TAG}.zip"
 )
 
@@ -76,6 +76,37 @@ def ensure_comfyui_available() -> Path:
     return comfyui_root
 
 
+def _torch_has_accelerator() -> bool:
+    """Return whether PyTorch can use a non-CPU device in this process."""
+    try:
+        import torch  # noqa: PLC0415
+    except Exception:
+        return False
+
+    checks = [
+        lambda: bool(getattr(torch.cuda, "is_available", lambda: False)()),
+        lambda: bool(
+            getattr(getattr(torch, "xpu", None), "is_available", lambda: False)()
+        ),
+        lambda: bool(
+            getattr(
+                getattr(getattr(torch, "backends", None), "mps", None),
+                "is_available",
+                lambda: False,
+            )()
+        ),
+        lambda: bool(getattr(getattr(torch, "npu", None), "is_available", lambda: False)()),
+        lambda: bool(getattr(getattr(torch, "mlu", None), "is_available", lambda: False)()),
+    ]
+    for check in checks:
+        try:
+            if check():
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def ensure_comfyui_on_path() -> Path:
     """Ensure vendored ComfyUI is available and importable; return the inserted path.
 
@@ -95,10 +126,15 @@ def ensure_comfyui_on_path() -> Path:
     # Apply VRAM mode env-var override before model_management is imported.
     vram_mode = os.environ.get("COMFY_VRAM_MODE", "").strip().lower()
     reserve_vram = os.environ.get("COMFY_RESERVE_VRAM", "").strip()
-    if (vram_mode or reserve_vram) and "comfy.model_management" not in sys.modules:
+    should_force_cpu = not _torch_has_accelerator()
+    if (
+        vram_mode or reserve_vram or should_force_cpu
+    ) and "comfy.model_management" not in sys.modules:
         try:
             import comfy.cli_args as _cli_args  # noqa: PLC0415
             _args = _cli_args.args
+            if should_force_cpu and hasattr(_args, "cpu"):
+                _args.cpu = True
             if vram_mode:
                 # Reset all vram flags first.
                 for _flag in ("lowvram", "novram", "highvram", "gpu_only"):

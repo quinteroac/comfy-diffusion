@@ -8,8 +8,8 @@ import subprocess
 from pathlib import Path
 
 SUBMODULE_NAME = "vendor/ComfyUI"
-SUBMODULE_URL = "https://github.com/comfyanonymous/ComfyUI.git"
-PINNED_TAG = "v0.18.3"
+SUBMODULE_URL = "https://github.com/Comfy-Org/ComfyUI.git"
+PINNED_TAG = "v0.20.2"
 
 
 def _repo_root() -> Path:
