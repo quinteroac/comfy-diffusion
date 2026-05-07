@@ -19,6 +19,9 @@ ia2v
     audio file.  The audio is VAE-encoded and injected with a zero noise mask
     so the sampler uses it as structural guidance.
     Mirrors ``video_ltx2_3_ia2v.json``.
+motion_track
+    Motion-track IC-LoRA pipeline.  Uses a rendered sparse-track control video
+    to guide object or region motion.
 
 Usage::
 
@@ -26,6 +29,7 @@ Usage::
     from comfy_diffusion.pipelines.video.ltx.ltx23.i2v import manifest, run
     from comfy_diffusion.pipelines.video.ltx.ltx23.flf2v import manifest, run
     from comfy_diffusion.pipelines.video.ltx.ltx23.ia2v import manifest, run
+    from comfy_diffusion.pipelines.video.ltx.ltx23.motion_track import manifest, run
 """
 
-__all__ = ["t2v", "i2v", "flf2v", "ia2v"]
+__all__ = ["t2v", "i2v", "flf2v", "ia2v", "motion_track"]

@@ -429,6 +429,213 @@ def ltxv_add_guide(
     return r[0], r[1], r[2]
 
 
+def _append_guide_attention_entry(
+    conditioning: Any,
+    pre_filter_count: int,
+    latent_shape: list[int],
+) -> Any:
+    """Append IC-LoRA guide attention metadata to conditioning."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    import node_helpers
+
+    existing_entries: list[Any] = []
+    for entry in conditioning:
+        entries = entry[1].get("guide_attention_entries")
+        if entries is not None:
+            existing_entries = list(entries)
+            break
+
+    updated_entries = [
+        *existing_entries,
+        {
+            "pre_filter_count": pre_filter_count,
+            "strength": 1.0,
+            "pixel_mask": None,
+            "latent_shape": latent_shape,
+        },
+    ]
+    return node_helpers.conditioning_set_values(
+        conditioning, {"guide_attention_entries": updated_entries}
+    )
+
+
+def _ltxv_dilate_latent(
+    latent: dict[str, Any],
+    horizontal_scale: int,
+    vertical_scale: int,
+) -> dict[str, Any]:
+    if horizontal_scale == 1 and vertical_scale == 1:
+        return latent
+
+    import torch
+
+    samples = latent["samples"]
+    mask = latent.get("noise_mask", None)
+    dilated_shape = samples.shape[:3] + (
+        samples.shape[3] * vertical_scale,
+        samples.shape[4] * horizontal_scale,
+    )
+
+    dilated_samples = torch.zeros(
+        dilated_shape,
+        device=samples.device,
+        dtype=samples.dtype,
+        requires_grad=False,
+    )
+    dilated_samples[..., ::vertical_scale, ::horizontal_scale] = samples
+
+    dilated_mask_shape = (
+        dilated_samples.shape[0],
+        1,
+        dilated_samples.shape[2],
+        dilated_samples.shape[3],
+        dilated_samples.shape[4],
+    )
+    dilated_mask = torch.full(
+        dilated_mask_shape,
+        -1.0,
+        device=samples.device,
+        dtype=samples.dtype,
+        requires_grad=False,
+    )
+    dilated_mask[..., ::vertical_scale, ::horizontal_scale] = (
+        mask if mask is not None else 1.0
+    )
+    return {"samples": dilated_samples, "noise_mask": dilated_mask}
+
+
+def ltx_add_video_ic_lora_guide(
+    positive: Any,
+    negative: Any,
+    vae: Any,
+    latent: dict[str, Any],
+    image: Any,
+    frame_idx: int = 0,
+    strength: float = 1.0,
+    latent_downscale_factor: float = 1.0,
+    crop: str = "disabled",
+    use_tiled_encode: bool = False,
+    tile_size: int = 256,
+    tile_overlap: int = 64,
+) -> tuple[Any, Any, dict[str, Any]]:
+    """Inject a video IC-LoRA guide into LTXV conditioning and latent.
+
+    Mirrors Lightricks' ``LTXAddVideoICLoRAGuide`` node. This variant supports
+    downscaled reference latents, which the LTX-2.3 motion-track IC-LoRA uses
+    with ``reference_downscale_factor=2`` / reference resolution ``0.5x``.
+    """
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+
+    import comfy.utils
+    import comfy_extras.nodes_lt as nodes_lt
+    import torch
+
+    scale_factors = vae.downscale_index_formula
+    latent_image = latent["samples"]
+    noise_mask = nodes_lt.get_noise_mask(latent)
+
+    _, _, latent_length, latent_height, latent_width = latent_image.shape
+
+    time_scale_factor = scale_factors[0]
+    num_frames_to_keep = (
+        ((image.shape[0] - 1) // time_scale_factor) * time_scale_factor + 1
+    )
+    causal_fix = frame_idx == 0 or num_frames_to_keep == 1
+    if not causal_fix:
+        image = torch.cat([image[:1], image], dim=0)
+
+    images = image[
+        : ((image.shape[0] - 1) // time_scale_factor) * time_scale_factor + 1
+    ]
+    target_width = int(latent_width * scale_factors[1] / latent_downscale_factor)
+    target_height = int(latent_height * scale_factors[2] / latent_downscale_factor)
+    pixels = comfy.utils.common_upscale(
+        images.movedim(-1, 1),
+        target_width,
+        target_height,
+        "bilinear",
+        crop=crop,
+    ).movedim(1, -1)
+    encode_pixels = pixels[:, :, :, :3]
+    if use_tiled_encode:
+        guide_latent = vae.encode_tiled(
+            encode_pixels,
+            tile_x=tile_size,
+            tile_y=tile_size,
+            overlap=tile_overlap,
+        )
+    else:
+        guide_latent = vae.encode(encode_pixels)
+
+    if not causal_fix:
+        guide_latent = guide_latent[:, :, 1:, :, :]
+        image = image[1:]
+
+    guide_orig_shape = list(guide_latent.shape[2:])
+    guide_mask = None
+
+    if latent_downscale_factor > 1:
+        downscale_int = int(latent_downscale_factor)
+        if latent_width % downscale_int != 0 or latent_height % downscale_int != 0:
+            raise ValueError(
+                f"Latent spatial size {latent_width}x{latent_height} must be divisible "
+                f"by latent_downscale_factor {latent_downscale_factor}"
+            )
+
+        dilated = _ltxv_dilate_latent(
+            {"samples": guide_latent},
+            horizontal_scale=downscale_int,
+            vertical_scale=downscale_int,
+        )
+        guide_mask = dilated["noise_mask"]
+        guide_latent = dilated["samples"]
+
+    iclora_tokens_added = (
+        guide_latent.shape[2] * guide_latent.shape[3] * guide_latent.shape[4]
+    )
+
+    frame_idx, latent_idx = nodes_lt.LTXVAddGuide.get_latent_index(
+        positive,
+        latent_length,
+        len(image),
+        frame_idx,
+        scale_factors,
+    )
+    if latent_idx + guide_latent.shape[2] > latent_length:
+        raise ValueError("Conditioning frames exceed the length of the latent sequence.")
+
+    positive, negative, latent_image, noise_mask = nodes_lt.LTXVAddGuide.append_keyframe(
+        positive,
+        negative,
+        frame_idx,
+        latent_image,
+        noise_mask,
+        guide_latent,
+        strength,
+        scale_factors,
+        guide_mask=guide_mask,
+        latent_downscale_factor=latent_downscale_factor,
+        causal_fix=causal_fix,
+    )
+
+    positive = _append_guide_attention_entry(
+        positive,
+        iclora_tokens_added,
+        guide_orig_shape,
+    )
+    negative = _append_guide_attention_entry(
+        negative,
+        iclora_tokens_added,
+        guide_orig_shape,
+    )
+
+    return positive, negative, {"samples": latent_image, "noise_mask": noise_mask}
+
+
 def conditioning_zero_out(conditioning: Any) -> list[Any]:
     """Zero out conditioning tensors.
 
@@ -1976,6 +2183,7 @@ __all__ = [
     "ltxv_img_to_video",
     "ltxv_conditioning",
     "ltxv_crop_guides",
+    "ltx_add_video_ic_lora_guide",
     "conditioning_zero_out",
     "conditioning_combine",
     "conditioning_set_mask",

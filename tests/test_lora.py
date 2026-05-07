@@ -13,6 +13,7 @@ from typing import Any
 import comfy_diffusion
 import comfy_diffusion.lora as lora_module
 from comfy_diffusion import apply_lora
+from comfy_diffusion.lora import apply_ic_lora_model_only
 
 
 def _repo_root() -> Path:
@@ -35,8 +36,8 @@ def _run_python(code: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_lora_module_exports_only_apply_lora() -> None:
-    assert lora_module.__all__ == ["apply_lora"]
+def test_lora_module_exports_expected_helpers() -> None:
+    assert lora_module.__all__ == ["apply_lora", "apply_ic_lora_model_only"]
 
 
 def test_apply_lora_signature_matches_contract() -> None:
@@ -44,6 +45,14 @@ def test_apply_lora_signature_matches_contract() -> None:
     assert str(signature) == (
         "(model: 'Any', clip: 'Any', path: 'str | Path', "
         "strength_model: 'float', strength_clip: 'float') -> 'tuple[Any, Any]'"
+    )
+
+
+def test_apply_ic_lora_model_only_signature_matches_contract() -> None:
+    signature = inspect.signature(apply_ic_lora_model_only)
+    assert str(signature) == (
+        "(model: 'Any', path: 'str | Path', strength_model: 'float' = 1.0) "
+        "-> 'tuple[Any, float]'"
     )
 
 
@@ -107,6 +116,107 @@ def test_apply_lora_returns_patched_model_and_clip_tuple(
         "strength_model": 0.8,
         "strength_clip": 0.8,
     }
+
+
+def test_apply_ic_lora_model_only_returns_model_and_metadata_downscale(
+    monkeypatch: Any,
+) -> None:
+    model = object()
+    patched_model = object()
+    loaded_lora = object()
+    calls: dict[str, Any] = {}
+
+    def fake_load_torch_file(
+        path: str,
+        *,
+        safe_load: bool,
+        return_metadata: bool,
+    ) -> tuple[object, dict[str, str]]:
+        calls["load_torch_file"] = {
+            "path": path,
+            "safe_load": safe_load,
+            "return_metadata": return_metadata,
+        }
+        return loaded_lora, {"reference_downscale_factor": "2"}
+
+    def fake_load_lora_for_models(
+        model_arg: object,
+        clip_arg: object | None,
+        lora_arg: object,
+        strength_model_arg: float,
+        strength_clip_arg: float,
+    ) -> tuple[object, None]:
+        calls["load_lora_for_models"] = {
+            "model": model_arg,
+            "clip": clip_arg,
+            "lora": lora_arg,
+            "strength_model": strength_model_arg,
+            "strength_clip": strength_clip_arg,
+        }
+        return patched_model, None
+
+    import types
+
+    comfy_module = types.ModuleType("comfy")
+    comfy_utils_module = types.ModuleType("comfy.utils")
+    comfy_sd_module = types.ModuleType("comfy.sd")
+
+    comfy_utils_module.load_torch_file = fake_load_torch_file
+    comfy_sd_module.load_lora_for_models = fake_load_lora_for_models
+    comfy_module.utils = comfy_utils_module
+    comfy_module.sd = comfy_sd_module
+
+    monkeypatch.setitem(sys.modules, "comfy", comfy_module)
+    monkeypatch.setitem(sys.modules, "comfy.utils", comfy_utils_module)
+    monkeypatch.setitem(sys.modules, "comfy.sd", comfy_sd_module)
+
+    result = lora_module.apply_ic_lora_model_only(model, "/tmp/ic.safetensors", 0.8)
+
+    assert result == (patched_model, 2.0)
+    assert calls["load_torch_file"] == {
+        "path": "/tmp/ic.safetensors",
+        "safe_load": True,
+        "return_metadata": True,
+    }
+    assert calls["load_lora_for_models"] == {
+        "model": model,
+        "clip": None,
+        "lora": loaded_lora,
+        "strength_model": 0.8,
+        "strength_clip": 0.0,
+    }
+
+
+def test_apply_ic_lora_model_only_defaults_downscale_to_one(monkeypatch: Any) -> None:
+    model = object()
+    loaded_lora = object()
+
+    def fake_load_torch_file(
+        path: str,
+        *,
+        safe_load: bool,
+        return_metadata: bool,
+    ) -> tuple[object, dict[str, str]]:
+        return loaded_lora, {}
+
+    import types
+
+    comfy_module = types.ModuleType("comfy")
+    comfy_utils_module = types.ModuleType("comfy.utils")
+    comfy_sd_module = types.ModuleType("comfy.sd")
+
+    comfy_utils_module.load_torch_file = fake_load_torch_file
+    comfy_module.utils = comfy_utils_module
+    comfy_module.sd = comfy_sd_module
+
+    monkeypatch.setitem(sys.modules, "comfy", comfy_module)
+    monkeypatch.setitem(sys.modules, "comfy.utils", comfy_utils_module)
+    monkeypatch.setitem(sys.modules, "comfy.sd", comfy_sd_module)
+
+    assert lora_module.apply_ic_lora_model_only(model, "/tmp/ic.safetensors", 0.0) == (
+        model,
+        1.0,
+    )
 
 
 def test_apply_lora_is_re_exported_from_package_root() -> None:
