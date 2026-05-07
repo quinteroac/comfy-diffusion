@@ -304,6 +304,7 @@ def test_conditioning_public_api_exports_expected_entrypoints() -> None:
         "ltxv_img_to_video",
         "ltxv_conditioning",
         "ltxv_crop_guides",
+        "ltx_add_video_ic_lora_guide",
         "conditioning_zero_out",
         "conditioning_combine",
         "conditioning_set_mask",

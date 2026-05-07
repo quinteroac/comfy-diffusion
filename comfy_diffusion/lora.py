@@ -31,4 +31,48 @@ def apply_lora(
     return cast(tuple[Any, Any], patched)
 
 
-__all__ = ["apply_lora"]
+def apply_ic_lora_model_only(
+    model: Any,
+    path: str | Path,
+    strength_model: float = 1.0,
+) -> tuple[Any, float]:
+    """Apply an IC-LoRA to a model and return its reference downscale factor.
+
+    Mirrors Lightricks' ``LTXICLoRALoaderModelOnly`` node: the LoRA is applied
+    to the diffusion model only, and ``reference_downscale_factor`` is read
+    from safetensors metadata. Missing or invalid metadata falls back to ``1.0``.
+    """
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+
+    import comfy.sd
+    import comfy.utils
+
+    lora_path = str(Path(path))
+    loaded = comfy.utils.load_torch_file(
+        lora_path,
+        safe_load=True,
+        return_metadata=True,
+    )
+    lora, metadata = loaded
+
+    try:
+        latent_downscale_factor = float(metadata["reference_downscale_factor"])
+    except (KeyError, TypeError, ValueError):
+        latent_downscale_factor = 1.0
+
+    if strength_model == 0:
+        return model, latent_downscale_factor
+
+    patched_model, _ = comfy.sd.load_lora_for_models(
+        model,
+        None,
+        lora,
+        strength_model,
+        0.0,
+    )
+    return patched_model, latent_downscale_factor
+
+
+__all__ = ["apply_lora", "apply_ic_lora_model_only"]
