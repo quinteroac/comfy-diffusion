@@ -146,6 +146,47 @@ def test_ltxv_audio_vae_decode_calls_vae_decode_and_returns_audio_dict() -> None
     assert vae2.calls == [fake_latent_tensor]
 
 
+def test_ltxv_audio_vae_decode_supports_comfy_vae_wrapper() -> None:
+    class FakeAudioTensor:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, Any]] = []
+
+        def movedim(self, source: int, destination: int) -> "FakeAudioTensor":
+            self.calls.append(("movedim", (source, destination)))
+            return self
+
+        def to(self, device: Any) -> "FakeAudioTensor":
+            self.calls.append(("to", device))
+            return self
+
+    class FakeFirstStageModel:
+        output_sample_rate = 48000
+
+        def __init__(self) -> None:
+            self.calls: list[Any] = []
+
+        def decode(self, latent: Any) -> FakeAudioTensor:
+            self.calls.append(latent)
+            return fake_audio
+
+    class FakeLatentTensor:
+        device = "cuda:0"
+
+    fake_audio = FakeAudioTensor()
+    fake_latent = FakeLatentTensor()
+
+    class FakeComfyVae:
+        def __init__(self) -> None:
+            self.first_stage_model = FakeFirstStageModel()
+
+    vae = FakeComfyVae()
+    result = ltxv_audio_vae_decode(vae, {"samples": fake_latent})
+
+    assert result == {"waveform": fake_audio, "sample_rate": 48000}
+    assert vae.first_stage_model.calls == [fake_latent]
+    assert fake_audio.calls == [("to", "cuda:0")]
+
+
 def test_ltxv_empty_latent_audio_signature_matches_contract() -> None:
     signature = inspect.signature(ltxv_empty_latent_audio)
     assert (
