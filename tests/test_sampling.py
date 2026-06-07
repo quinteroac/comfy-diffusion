@@ -17,10 +17,13 @@ from comfy_diffusion.sampling import (
     ays_scheduler,
     basic_guider,
     basic_scheduler,
+    cfg_override,
     cfg_guider,
     disable_noise,
+    dual_model_guider,
     flux2_scheduler,
     get_sampler,
+    ideogram4_scheduler,
     karras_scheduler,
     ltxv_scheduler,
     manual_sigmas,
@@ -62,12 +65,15 @@ def test_sampling_public_api_exports_all_entrypoints() -> None:
     assert sample_custom.__name__ == "sample_custom"
     assert basic_guider.__name__ == "basic_guider"
     assert cfg_guider.__name__ == "cfg_guider"
+    assert dual_model_guider.__name__ == "dual_model_guider"
+    assert cfg_override.__name__ == "cfg_override"
     assert random_noise.__name__ == "random_noise"
     assert disable_noise.__name__ == "disable_noise"
     assert basic_scheduler.__name__ == "basic_scheduler"
     assert karras_scheduler.__name__ == "karras_scheduler"
     assert ays_scheduler.__name__ == "ays_scheduler"
     assert flux2_scheduler.__name__ == "flux2_scheduler"
+    assert ideogram4_scheduler.__name__ == "ideogram4_scheduler"
     assert ltxv_scheduler.__name__ == "ltxv_scheduler"
     assert split_sigmas.__name__ == "split_sigmas"
     assert split_sigmas_denoise.__name__ == "split_sigmas_denoise"
@@ -81,6 +87,8 @@ def test_sampling_public_api_exports_all_entrypoints() -> None:
         "sample_custom_simple",
         "basic_guider",
         "cfg_guider",
+        "dual_model_guider",
+        "cfg_override",
         "video_linear_cfg_guidance",
         "video_triangle_cfg_guidance",
         "random_noise",
@@ -89,6 +97,7 @@ def test_sampling_public_api_exports_all_entrypoints() -> None:
         "karras_scheduler",
         "ays_scheduler",
         "flux2_scheduler",
+        "ideogram4_scheduler",
         "ltxv_scheduler",
         "sd_turbo_scheduler",
         "split_sigmas",
@@ -145,6 +154,24 @@ def test_cfg_guider_signature_matches_contract() -> None:
     )
 
 
+def test_dual_model_guider_signature_matches_contract() -> None:
+    signature = inspect.signature(dual_model_guider)
+
+    assert str(signature) == (
+        "(model: 'Any', positive: 'Any', cfg: 'float', model_negative: 'Any', "
+        "negative: 'Any | None' = None) -> 'Any'"
+    )
+
+
+def test_cfg_override_signature_matches_contract() -> None:
+    signature = inspect.signature(cfg_override)
+
+    assert str(signature) == (
+        "(model: 'Any', cfg: 'float', start_percent: 'float' = 0.0, "
+        "end_percent: 'float' = 1.0) -> 'Any'"
+    )
+
+
 def test_random_noise_signature_matches_contract() -> None:
     signature = inspect.signature(random_noise)
 
@@ -186,6 +213,15 @@ def test_flux2_scheduler_signature_matches_contract() -> None:
     signature = inspect.signature(flux2_scheduler)
 
     assert str(signature) == "(steps: 'int', width: 'int', height: 'int') -> 'Any'"
+
+
+def test_ideogram4_scheduler_signature_matches_contract() -> None:
+    signature = inspect.signature(ideogram4_scheduler)
+
+    assert str(signature) == (
+        "(steps: 'int', width: 'int', height: 'int', mu: 'float' = 0.0, "
+        "std: 'float' = 1.75) -> 'Any'"
+    )
 
 
 def test_ltxv_scheduler_signature_matches_contract() -> None:
@@ -279,6 +315,113 @@ def test_cfg_guider_wraps_cfg_guider_type(monkeypatch: pytest.MonkeyPatch) -> No
     assert guider.received_positive is positive
     assert guider.received_negative is negative
     assert guider.received_cfg == cfg
+
+
+def test_dual_model_guider_wraps_dual_model_guider_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = object()
+    model_negative = object()
+    positive = object()
+
+    class FakeDualModelGuider:
+        @classmethod
+        def execute(
+            cls,
+            received_model: Any,
+            received_positive: Any,
+            received_cfg: float,
+            *,
+            model_negative: Any = None,
+            negative: Any = None,
+        ) -> tuple[Any]:
+            return (
+                {
+                    "model": received_model,
+                    "positive": received_positive,
+                    "cfg": received_cfg,
+                    "model_negative": model_negative,
+                    "negative": negative,
+                },
+            )
+
+    monkeypatch.setattr(
+        sampling_module,
+        "_get_dual_model_guider_type",
+        lambda: FakeDualModelGuider,
+    )
+
+    guider = dual_model_guider(model, positive, 7.0, model_negative)
+
+    assert guider == {
+        "model": model,
+        "positive": positive,
+        "cfg": 7.0,
+        "model_negative": model_negative,
+        "negative": None,
+    }
+
+
+def test_cfg_override_wraps_cfg_override_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    model = object()
+
+    class FakeCFGOverride:
+        @classmethod
+        def execute(
+            cls,
+            received_model: Any,
+            received_cfg: float,
+            received_start_percent: float,
+            received_end_percent: float,
+        ) -> tuple[Any]:
+            return (
+                {
+                    "model": received_model,
+                    "cfg": received_cfg,
+                    "start_percent": received_start_percent,
+                    "end_percent": received_end_percent,
+                },
+            )
+
+    monkeypatch.setattr(sampling_module, "_get_cfg_override_type", lambda: FakeCFGOverride)
+
+    assert cfg_override(model, 3.0, 0.7, 1.0) == {
+        "model": model,
+        "cfg": 3.0,
+        "start_percent": 0.7,
+        "end_percent": 1.0,
+    }
+
+
+def test_ideogram4_scheduler_wraps_ideogram4_scheduler_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeIdeogram4Scheduler:
+        @classmethod
+        def execute(
+            cls,
+            steps: int,
+            width: int,
+            height: int,
+            mu: float,
+            std: float,
+        ) -> tuple[Any]:
+            return (("sigmas", steps, width, height, mu, std),)
+
+    monkeypatch.setattr(
+        sampling_module,
+        "_get_ideogram4_scheduler_type",
+        lambda: FakeIdeogram4Scheduler,
+    )
+
+    assert ideogram4_scheduler(48, 1024, 768, 0.25, 1.5) == (
+        "sigmas",
+        48,
+        1024,
+        768,
+        0.25,
+        1.5,
+    )
 
 
 class _FakeVectorTensor:

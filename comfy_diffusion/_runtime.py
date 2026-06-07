@@ -13,7 +13,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-COMFYUI_PINNED_TAG = "v0.20.2"
+COMFYUI_PINNED_TAG = "v0.24.1"
 COMFYUI_PINNED_ARCHIVE_URL = (
     "https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/"
     f"{COMFYUI_PINNED_TAG}.zip"

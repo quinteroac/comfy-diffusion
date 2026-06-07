@@ -53,6 +53,26 @@ def _get_cfg_guider_type() -> Any:
     return CFGGuider
 
 
+def _get_dual_model_guider_type() -> Any:
+    """Resolve ComfyUI DualModelGuider implementation at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_custom_sampler import DualModelGuider
+
+    return DualModelGuider
+
+
+def _get_cfg_override_type() -> Any:
+    """Resolve ComfyUI CFGOverride implementation at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_custom_sampler import CFGOverride
+
+    return CFGOverride
+
+
 def _get_random_noise_type() -> Any:
     """Resolve ComfyUI RandomNoise implementation at call time."""
     from ._runtime import ensure_comfyui_on_path
@@ -111,6 +131,16 @@ def _get_flux2_scheduler_type() -> Any:
     from comfy_extras.nodes_flux import Flux2Scheduler
 
     return Flux2Scheduler
+
+
+def _get_ideogram4_scheduler_type() -> Any:
+    """Resolve ComfyUI Ideogram4Scheduler implementation at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_ideogram4 import Ideogram4Scheduler
+
+    return Ideogram4Scheduler
 
 
 def _get_ltxv_scheduler_type() -> Any:
@@ -216,6 +246,44 @@ def cfg_guider(model: Any, positive: Any, negative: Any, cfg: Any) -> Any:
     return guider
 
 
+def dual_model_guider(
+    model: Any,
+    positive: Any,
+    cfg: float,
+    model_negative: Any,
+    negative: Any | None = None,
+) -> Any:
+    """Create a DualModelGuider for asymmetric CFG pipelines.
+
+    When ``negative`` is ``None``, ComfyUI runs the negative model as an
+    image-only unconditional branch.  This is the expected local Ideogram 4
+    setup.
+    """
+    dual_model_guider_type = _get_dual_model_guider_type()
+    return _unwrap_node_output(
+        dual_model_guider_type.execute(
+            model,
+            positive,
+            cfg,
+            model_negative=model_negative,
+            negative=negative,
+        )
+    )
+
+
+def cfg_override(
+    model: Any,
+    cfg: float,
+    start_percent: float = 0.0,
+    end_percent: float = 1.0,
+) -> Any:
+    """Patch a model to override CFG over a percent slice of sampling steps."""
+    cfg_override_type = _get_cfg_override_type()
+    return _unwrap_node_output(
+        cfg_override_type.execute(model, cfg, start_percent, end_percent)
+    )
+
+
 def video_linear_cfg_guidance(model: Any, min_cfg: float) -> Any:
     """Patch a model clone with a frame-wise linear CFG guidance ramp."""
 
@@ -316,6 +384,20 @@ def flux2_scheduler(steps: int, width: int, height: int) -> Any:
     """Create SIGMAS using ComfyUI Flux2Scheduler."""
     flux2_scheduler_type = _get_flux2_scheduler_type()
     return _unwrap_node_output(flux2_scheduler_type.execute(steps, width, height))
+
+
+def ideogram4_scheduler(
+    steps: int,
+    width: int,
+    height: int,
+    mu: float = 0.0,
+    std: float = 1.75,
+) -> Any:
+    """Create SIGMAS using ComfyUI Ideogram4Scheduler."""
+    ideogram4_scheduler_type = _get_ideogram4_scheduler_type()
+    return _unwrap_node_output(
+        ideogram4_scheduler_type.execute(steps, width, height, mu, std)
+    )
 
 
 def ltxv_scheduler(
@@ -571,6 +653,8 @@ __all__ = [
     "sample_custom_simple",
     "basic_guider",
     "cfg_guider",
+    "dual_model_guider",
+    "cfg_override",
     "video_linear_cfg_guidance",
     "video_triangle_cfg_guidance",
     "random_noise",
@@ -579,6 +663,7 @@ __all__ = [
     "karras_scheduler",
     "ays_scheduler",
     "flux2_scheduler",
+    "ideogram4_scheduler",
     "ltxv_scheduler",
     "sd_turbo_scheduler",
     "split_sigmas",

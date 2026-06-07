@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from collections.abc import Mapping
 from typing import Any, Protocol, cast
 
@@ -70,6 +71,32 @@ def _inference_mode_context() -> Any:
     if callable(no_grad):
         return no_grad()
     return nullcontext()
+
+
+def _normal_tensor(samples: Any) -> Any:
+    """Return a non-inference tensor when PyTorch supports that distinction."""
+    if hasattr(samples, "clone"):
+        return samples.clone()
+    return samples
+
+
+@contextmanager
+def _non_inplace_vae_output(vae: Any) -> Iterator[None]:
+    """Avoid ComfyUI VAE in-place output normalization on inference tensors."""
+    original = getattr(vae, "process_output", None)
+    if original is not None:
+        def _process_output(image: Any) -> Any:
+            normalized = (image + 1.0).div(2.0).clamp(0.0, 1.0)
+            image.copy_(normalized)
+            return image
+
+        vae.process_output = _process_output
+
+    try:
+        yield
+    finally:
+        if original is not None:
+            vae.process_output = original
 
 
 def _clip_to_uint8(value: float) -> int:
@@ -148,8 +175,10 @@ def vae_decode(vae: _VaeDecoder, latent: Mapping[str, Any]) -> Image.Image:
         samples = latent["samples"]
         if getattr(samples, "is_nested", False):
             samples = samples.unbind()[0]
+        samples = _normal_tensor(samples)
 
-        images = vae.decode(samples)
+        with _non_inplace_vae_output(vae):
+            images = vae.decode(samples)
         if len(images.shape) == 5:
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
 
@@ -182,8 +211,10 @@ def vae_decode_tiled(
         samples = latent["samples"]
         if getattr(samples, "is_nested", False):
             samples = samples.unbind()[0]
+        samples = _normal_tensor(samples)
 
-        images = vae.decode_tiled(samples, tile_x=tile_size, tile_y=tile_size, overlap=overlap)
+        with _non_inplace_vae_output(vae):
+            images = vae.decode_tiled(samples, tile_x=tile_size, tile_y=tile_size, overlap=overlap)
         if len(images.shape) == 5:
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
 
@@ -201,12 +232,14 @@ def vae_decode_batch(vae: _VaeDecoder, latent: Mapping[str, Any]) -> list[Image.
         samples = latent["samples"]
         if getattr(samples, "is_nested", False):
             samples = samples.unbind()[0]
+        samples = _normal_tensor(samples)
 
         sample_dims = len(samples.shape)
         if sample_dims not in (4, 5):
             raise ValueError("latent samples must be 4D or 5D")
 
-        images = vae.decode(samples)
+        with _non_inplace_vae_output(vae):
+            images = vae.decode(samples)
         image_dims = len(images.shape)
         if image_dims == 5:
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
@@ -241,6 +274,7 @@ def vae_decode_batch_tiled(
         samples = latent["samples"]
         if getattr(samples, "is_nested", False):
             samples = samples.unbind()[0]
+        samples = _normal_tensor(samples)
 
         sample_dims = len(samples.shape)
         if sample_dims not in (4, 5):
@@ -251,13 +285,7 @@ def vae_decode_batch_tiled(
 
         result: list[Image.Image] = []
 
-        # process_output uses in-place ops that fail on inference tensors.
-        # Patch the instance attribute temporarily to use non-in-place equivalents.
-        _orig_process_output = getattr(vae, "process_output", None)
-        if _orig_process_output is not None:
-            vae.process_output = lambda image: (image + 1.0).div(2.0).clamp(0.0, 1.0)
-
-        try:
+        with _non_inplace_vae_output(vae):
             if sample_dims == 5:
                 # Video latents can be either (B, C, T, H, W) or (B, T, C, H, W).
                 # Normalize to (B, C, T, H, W) and decode in a single 3D tiled pass
@@ -315,10 +343,6 @@ def vae_decode_batch_tiled(
                     result.append(_tensor_like_to_pil(images[0]))
                 else:
                     raise ValueError("unsupported decoded image shape")
-        finally:
-            if _orig_process_output is not None:
-                vae.process_output = _orig_process_output
-
         if not result:
             raise ValueError("decoded image tensor is empty")
 
