@@ -669,6 +669,38 @@ def create_video(images: Any, audio: Any, fps: float) -> Any:
     return raw[0]
 
 
+def _get_void_warped_noise_type() -> Any:
+    """Resolve ComfyUI VOIDWarpedNoise node at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_void import VOIDWarpedNoise
+
+    return VOIDWarpedNoise
+
+
+def void_warped_noise(
+    optical_flow: Any,
+    video: Any,
+    width: int = 672,
+    height: int = 384,
+    length: int = 45,
+    batch_size: int = 1,
+) -> dict[str, Any]:
+    """Generate optical-flow warped noise for VOID pass-2 refinement."""
+    node_type = _get_void_warped_noise_type()
+    output = node_type.execute(
+        optical_flow=optical_flow,
+        video=video,
+        width=width,
+        height=height,
+        length=length,
+        batch_size=batch_size,
+    )
+    result = getattr(output, "result", output)
+    return result[0]
+
+
 def apply_cfg_norm(model: Any, strength: float = 1.0) -> Any:
     """Normalise the CFG prediction to the magnitude of the conditional output.
 
@@ -711,5 +743,6 @@ __all__ = [
     "ltxv_img_to_video_inplace_kj",
     "ltx2_sampling_preview_override",
     "create_video",
+    "void_warped_noise",
     "apply_cfg_norm",
 ]

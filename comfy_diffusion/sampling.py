@@ -173,6 +173,26 @@ def _get_sampler_custom_advanced_type() -> Any:
     return SamplerCustomAdvanced
 
 
+def _get_void_sampler_type() -> Any:
+    """Resolve ComfyUI VOIDSampler implementation at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_void import VOIDSampler
+
+    return VOIDSampler
+
+
+def _get_void_warped_noise_source_type() -> Any:
+    """Resolve ComfyUI VOIDWarpedNoiseSource implementation at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_void import VOIDWarpedNoiseSource
+
+    return VOIDWarpedNoiseSource
+
+
 def _get_sd_turbo_scheduler_type() -> Any:
     """Resolve ComfyUI SDTurboScheduler implementation at call time."""
     from ._runtime import ensure_comfyui_on_path
@@ -445,6 +465,18 @@ def get_sampler(sampler_name: str) -> Any:
     return _unwrap_node_output(ksampler_select_type.execute(sampler_name))
 
 
+def void_sampler() -> Any:
+    """Build the DDIM sampler required by VOID inpainting models."""
+    void_sampler_type = _get_void_sampler_type()
+    return _unwrap_node_output(void_sampler_type.execute())
+
+
+def void_warped_noise_source(warped_noise: dict[str, Any]) -> Any:
+    """Convert a VOID warped-noise latent into a custom NOISE source."""
+    noise_source_type = _get_void_warped_noise_source_type()
+    return _unwrap_node_output(noise_source_type.execute(warped_noise=warped_noise))
+
+
 def _get_flux_kv_cache_type() -> Any:
     """Resolve ComfyUI FluxKVCache implementation at call time."""
     from ._runtime import ensure_comfyui_on_path
@@ -669,6 +701,8 @@ __all__ = [
     "split_sigmas",
     "split_sigmas_denoise",
     "get_sampler",
+    "void_sampler",
+    "void_warped_noise_source",
     "set_first_sigma",
     "manual_sigmas",
     "flux_kv_cache",

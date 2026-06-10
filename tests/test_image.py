@@ -211,6 +211,7 @@ def test_image_module_exports_expected_entrypoints() -> None:
     assert image_module.__all__ == [
         "load_image",
         "image_to_tensor",
+        "images_to_tensor",
         "image_pad_for_outpaint",
         "image_upscale_with_model",
         "image_from_batch",

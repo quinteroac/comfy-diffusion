@@ -103,6 +103,8 @@ def test_sampling_public_api_exports_all_entrypoints() -> None:
         "split_sigmas",
         "split_sigmas_denoise",
         "get_sampler",
+        "void_sampler",
+        "void_warped_noise_source",
         "set_first_sigma",
         "manual_sigmas",
         "flux_kv_cache",

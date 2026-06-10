@@ -57,3 +57,6 @@ qwen_edit_2511_output.png
 output.wav
 .agents/CLI_REFACTOR_PLAN.md
 output.mp4
+.hf_cache/
+models/
+outputs/

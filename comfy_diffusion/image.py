@@ -324,6 +324,15 @@ def image_to_tensor(image: PILImage.Image) -> Any:
     return torch.tensor([rows], dtype=torch.float32)
 
 
+def images_to_tensor(images: list[PILImage.Image]) -> Any:
+    """Convert PIL images to a BHWC float32 tensor."""
+    if not images:
+        raise ValueError("images must not be empty")
+    torch = _get_torch_module()
+    rows = [_pixels_to_float_rows(image.convert("RGB"), channels=3) for image in images]
+    return torch.tensor(rows, dtype=torch.float32)
+
+
 def ltxv_preprocess(image: Any, width: int, height: int, img_compression: int = 35) -> Any:
     """Preprocess image batch for LTXV img2vid with center resize and node compression."""
     comfy_utils, ltxv_preprocess_type = _get_ltxv_preprocess_dependencies()
@@ -788,6 +797,7 @@ def flux_kontext_image_scale(image: Any) -> Any:
 __all__ = [
     "load_image",
     "image_to_tensor",
+    "images_to_tensor",
     "image_pad_for_outpaint",
     "image_upscale_with_model",
     "image_from_batch",

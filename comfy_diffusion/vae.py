@@ -86,9 +86,7 @@ def _non_inplace_vae_output(vae: Any) -> Iterator[None]:
     original = getattr(vae, "process_output", None)
     if original is not None:
         def _process_output(image: Any) -> Any:
-            normalized = (image + 1.0).div(2.0).clamp(0.0, 1.0)
-            image.copy_(normalized)
-            return image
+            return (image + 1.0).div(2.0).clamp(0.0, 1.0)
 
         vae.process_output = _process_output
 

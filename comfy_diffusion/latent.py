@@ -93,6 +93,7 @@ def _get_latent_concat_type() -> Any:
     from ._runtime import ensure_comfyui_on_path
 
     ensure_comfyui_on_path()
+    import comfy_extras.nodes_post_processing  # noqa: F401
     from comfy_extras.nodes_latent import LatentConcat
 
     return LatentConcat
@@ -103,6 +104,7 @@ def _get_latent_cut_type() -> Any:
     from ._runtime import ensure_comfyui_on_path
 
     ensure_comfyui_on_path()
+    import comfy_extras.nodes_post_processing  # noqa: F401
     from comfy_extras.nodes_latent import LatentCut
 
     return LatentCut
@@ -113,6 +115,7 @@ def _get_replace_video_latent_frames_type() -> Any:
     from ._runtime import ensure_comfyui_on_path
 
     ensure_comfyui_on_path()
+    import comfy_extras.nodes_post_processing  # noqa: F401
     from comfy_extras.nodes_latent import ReplaceVideoLatentFrames
 
     return ReplaceVideoLatentFrames

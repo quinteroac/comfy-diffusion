@@ -365,6 +365,71 @@ def ltxv_crop_guides(
     return positive, negative, {"samples": latent_image, "noise_mask": noise_mask}
 
 
+def _get_void_quadmask_preprocess_type() -> Any:
+    """Resolve ComfyUI VOIDQuadmaskPreprocess node at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_void import VOIDQuadmaskPreprocess
+
+    return VOIDQuadmaskPreprocess
+
+
+def _get_void_inpaint_conditioning_type() -> Any:
+    """Resolve ComfyUI VOIDInpaintConditioning node at call time."""
+    from ._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    from comfy_extras.nodes_void import VOIDInpaintConditioning
+
+    return VOIDInpaintConditioning
+
+
+def void_quadmask_preprocess(mask: Any, dilate_width: int = 0) -> Any:
+    """Preprocess a VOID quadmask video mask.
+
+    Mirrors ComfyUI's ``VOIDQuadmaskPreprocess``.  The mask is quantized to the
+    four semantic VOID levels, inverted, and normalized for
+    ``void_inpaint_conditioning``.
+    """
+    node_type = _get_void_quadmask_preprocess_type()
+    output = node_type.execute(mask=mask, dilate_width=dilate_width)
+    result = getattr(output, "result", output)
+    return result[0]
+
+
+def void_inpaint_conditioning(
+    positive: Any,
+    negative: Any,
+    vae: Any,
+    video: Any,
+    quadmask: Any,
+    width: int = 672,
+    height: int = 384,
+    length: int = 45,
+    batch_size: int = 1,
+) -> tuple[Any, Any, dict[str, Any]]:
+    """Build VOID inpainting conditioning and the matching noise latent.
+
+    Mirrors ComfyUI's ``VOIDInpaintConditioning`` for CogVideoX-Fun-V1.5 VOID
+    inpainting models.
+    """
+    node_type = _get_void_inpaint_conditioning_type()
+    output = node_type.execute(
+        positive=positive,
+        negative=negative,
+        vae=vae,
+        video=video,
+        quadmask=quadmask,
+        width=width,
+        height=height,
+        length=length,
+        batch_size=batch_size,
+    )
+    result = getattr(output, "result", output)
+    return result[0], result[1], result[2]
+
+
 def _get_ltxv_add_guide_type() -> Any:
     """Resolve ComfyUI LTXVAddGuide node at call time."""
     from comfy_extras.nodes_lt import LTXVAddGuide
@@ -2183,6 +2248,8 @@ __all__ = [
     "ltxv_img_to_video",
     "ltxv_conditioning",
     "ltxv_crop_guides",
+    "void_quadmask_preprocess",
+    "void_inpaint_conditioning",
     "ltx_add_video_ic_lora_guide",
     "conditioning_zero_out",
     "conditioning_combine",

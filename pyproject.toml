@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-diffusion"
-version = "2.3.0"
+version = "2.3.1"
 description = "ComfyUI inference engine as a standalone Python library (no server, no UI)."
 readme = "README.md"
 license = { text = "GPL-3.0-only" }

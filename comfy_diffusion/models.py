@@ -76,6 +76,9 @@ class ModelManager:
         folder_paths.add_model_folder_path(
             "audio_encoders", str(self.models_dir / "audio_encoders"), is_default=True
         )
+        folder_paths.add_model_folder_path(
+            "optical_flow", str(self.models_dir / "optical_flow"), is_default=True
+        )
 
     def load_checkpoint(self, filename: str) -> CheckpointResult:
         """Load a checkpoint by filename from the configured checkpoints directory."""
@@ -408,6 +411,29 @@ class ModelManager:
                 f"unrecognised audio encoder state dict in: {model_path}"
             )
         return audio_encoder
+
+    def load_optical_flow(self, path: str | Path) -> Any:
+        """Load an optical-flow model from a path or filename.
+
+        Mirrors ComfyUI's ``OpticalFlowLoader`` used by VOID.  If ``path`` is an
+        absolute path, the file must exist.  Otherwise it is treated as a
+        filename under ``models_dir/optical_flow``.
+        """
+        ensure_comfyui_on_path()
+
+        p = Path(path)
+        if p.is_absolute():
+            if not p.is_file():
+                raise FileNotFoundError(f"optical flow model file not found: {p}")
+            model_name = p.name
+        else:
+            model_name = path if isinstance(path, str) else p.name
+
+        from comfy_extras.nodes_void import OpticalFlowLoader
+
+        output = OpticalFlowLoader.execute(model_name)
+        result = getattr(output, "result", output)
+        return result[0]
 
     def load_vae_kj(
         self,

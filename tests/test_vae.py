@@ -511,6 +511,48 @@ def test_vae_decode_batch_tiled_with_bcthw_latent_preserves_channel_dim() -> Non
     assert seen_shapes[0] == (1, 128, 11, 16, 24)
 
 
+def test_vae_decode_batch_tiled_process_output_avoids_inplace_copy() -> None:
+    class _CopyForbiddenTensor:
+        def __add__(self, _value: float) -> _CopyForbiddenTensor:
+            return self
+
+        def div(self, _value: float) -> _CopyForbiddenTensor:
+            return self
+
+        def clamp(self, _minimum: float, _maximum: float) -> _FakeTensor:
+            return _FakeTensor([[[[[0.2, 0.4, 0.6]]]]])
+
+        def copy_(self, _value: object) -> None:
+            raise RuntimeError("copy_ should not be called")
+
+    class _FakeVae:
+        def process_output(self, image: object) -> object:
+            return image
+
+        def decode_tiled(
+            self,
+            _value: Any,
+            *,
+            tile_x: int,
+            tile_y: int,
+            overlap: int,
+        ) -> object:
+            assert tile_x == 64
+            assert tile_y == 64
+            assert overlap == 8
+            return self.process_output(_CopyForbiddenTensor())
+
+    images = vae_decode_batch_tiled(
+        _FakeVae(),
+        {"samples": _FakeTensor([[[[[0.0, 0.0, 0.0]]]]])},
+        tile_size=64,
+        overlap=8,
+    )
+
+    assert len(images) == 1
+    assert images[0].mode == "RGB"
+
+
 def test_vae_decode_batch_tiled_uses_decode_tiled_protocol_signature() -> None:
     protocol_methods = set(vae_module._VaeDecoderTiled.__dict__.keys())
     assert "decode_tiled" in protocol_methods

@@ -57,6 +57,7 @@ def test_video_module_exports_expected_entrypoints() -> None:
         "ltxv_img_to_video_inplace_kj",
         "ltx2_sampling_preview_override",
         "create_video",
+        "void_warped_noise",
         "apply_cfg_norm",
     ]
 
