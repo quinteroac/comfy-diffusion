@@ -52,7 +52,7 @@ from comfy_diffusion.sampling import sample
 
 ## Quick Start
 
-Call `check_runtime()` before loading models or sampling. On first runtime use, comfy-diffusion can perform an automatic download of the pinned ComfyUI release when the vendored runtime is missing. Expected failures are returned as an error dict instead of being raised; `check_runtime()` returns an error dict for runtime bootstrap problems.
+Call `check_runtime()` before loading models or sampling. On first runtime use, comfy-diffusion can perform an automatic download of the pinned ComfyUI ref when the vendored runtime is missing. Expected failures are returned as an error dict instead of being raised; `check_runtime()` returns an error dict for runtime bootstrap problems.
 
 Example:
 

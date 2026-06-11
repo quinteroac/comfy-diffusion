@@ -18,7 +18,7 @@ from comfy_diffusion.runtime import check_runtime
 
 def _build_minimal_comfyui_zip() -> bytes:
     archive_buffer = io.BytesIO()
-    archive_root = f"ComfyUI-{_runtime.COMFYUI_PINNED_TAG}"
+    archive_root = f"ComfyUI-{_runtime.COMFYUI_PINNED_REF}"
 
     with zipfile.ZipFile(archive_buffer, mode="w") as archive:
         archive.writestr(f"{archive_root}/comfy/__init__.py", "")
@@ -123,7 +123,7 @@ def test_ensure_comfyui_available_downloads_and_extracts_when_runtime_is_missing
         def extractall(self, target_dir: str | Path) -> None:
             extracted_path = Path(target_dir)
             extracted_into["value"] = extracted_path
-            extracted_root = extracted_path / f"ComfyUI-{_runtime.COMFYUI_PINNED_TAG}"
+            extracted_root = extracted_path / f"ComfyUI-{_runtime.COMFYUI_PINNED_REF}"
             (extracted_root / "comfy").mkdir(parents=True)
             (extracted_root / "comfy" / "__init__.py").write_text("", encoding="utf-8")
 
@@ -137,7 +137,7 @@ def test_ensure_comfyui_available_downloads_and_extracts_when_runtime_is_missing
     assert comfyui_root.is_dir()
     assert (comfyui_root / "comfy").is_dir()
     assert observed_url["value"] == _runtime.COMFYUI_PINNED_ARCHIVE_URL
-    assert _runtime.COMFYUI_PINNED_TAG in observed_url["value"]
+    assert _runtime.COMFYUI_PINNED_REF in observed_url["value"]
     assert "value" in extracted_into
 
 
@@ -188,7 +188,7 @@ def test_runtime_pinned_ref_constant_matches_git_submodule_pin() -> None:
         encoding="utf-8"
     )
 
-    assert f"Pinned ComfyUI release tag: {_runtime.COMFYUI_PINNED_TAG}" in gitmodules_text
+    assert f"Pinned ComfyUI ref: {_runtime.COMFYUI_PINNED_REF}" in gitmodules_text
 
 
 @pytest.mark.parametrize(

@@ -30,7 +30,7 @@ def test_readme_quick_start_explains_automatic_comfyui_download() -> None:
     section = _quick_start_section(_readme_text())
 
     assert "automatic download" in section
-    assert "pinned ComfyUI release" in section
+    assert "pinned ComfyUI ref" in section
 
 
 def test_readme_quick_start_shows_error_dict_handling() -> None:

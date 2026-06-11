@@ -14,6 +14,7 @@ import pytest
 
 import comfy_diffusion.conditioning as conditioning
 from comfy_diffusion.conditioning import (
+    bernini_conditioning,
     conditioning_combine,
     conditioning_set_mask,
     conditioning_set_timestep_range,
@@ -277,6 +278,7 @@ def test_conditioning_public_api_exports_expected_entrypoints() -> None:
     assert flux_guidance.__name__ == "flux_guidance"
     assert encode_clip_vision.__name__ == "encode_clip_vision"
     assert wan_image_to_video.__name__ == "wan_image_to_video"
+    assert bernini_conditioning.__name__ == "bernini_conditioning"
     assert wan_first_last_frame_to_video.__name__ == "wan_first_last_frame_to_video"
     assert ltxv_img_to_video.__name__ == "ltxv_img_to_video"
     assert ltxv_conditioning.__name__ == "ltxv_conditioning"
@@ -285,6 +287,7 @@ def test_conditioning_public_api_exports_expected_entrypoints() -> None:
         "encode_prompt_flux",
         "encode_clip_vision",
         "wan_image_to_video",
+        "bernini_conditioning",
         "wan_first_last_frame_to_video",
         "wan_vace_to_video",
         "wan_fun_control_to_video",

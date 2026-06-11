@@ -13,10 +13,10 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-COMFYUI_PINNED_TAG = "v0.24.1"
+COMFYUI_PINNED_REF = "fb991e2c1e7476809d566a4620c2132e05a466dd"
 COMFYUI_PINNED_ARCHIVE_URL = (
-    "https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/"
-    f"{COMFYUI_PINNED_TAG}.zip"
+    "https://github.com/Comfy-Org/ComfyUI/archive/"
+    f"{COMFYUI_PINNED_REF}.zip"
 )
 
 
@@ -40,7 +40,7 @@ def _has_comfyui_runtime(comfyui_root: Path) -> bool:
 
 
 def _download_and_extract_pinned_comfyui(comfyui_root: Path) -> None:
-    """Download and extract the pinned ComfyUI release into vendor/ComfyUI."""
+    """Download and extract the pinned ComfyUI ref into vendor/ComfyUI."""
     vendor_dir = comfyui_root.parent
     vendor_dir.mkdir(parents=True, exist_ok=True)
 
@@ -67,7 +67,7 @@ def _download_and_extract_pinned_comfyui(comfyui_root: Path) -> None:
 
 
 def ensure_comfyui_available() -> Path:
-    """Ensure vendored ComfyUI exists; download pinned release if missing."""
+    """Ensure vendored ComfyUI exists; download pinned ref if missing."""
     comfyui_root = _comfyui_root()
 
     if not _has_comfyui_runtime(comfyui_root):

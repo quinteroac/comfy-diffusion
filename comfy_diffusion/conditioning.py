@@ -181,6 +181,83 @@ def wan_image_to_video(
     return positive, negative, {"samples": latent}
 
 
+def _resize_long_edge(image: Any, max_size: int, stride: int = 16) -> Any:
+    """Resize an image batch so the long edge is capped and dimensions snap to stride."""
+    _, _, comfy_utils, _ = _get_wan_conditioning_dependencies()
+
+    height = image.shape[1]
+    width = image.shape[2]
+    scale = min(max_size / max(height, width), 1.0)
+    resized_height = max(stride, round(height * scale / stride) * stride)
+    resized_width = max(stride, round(width * scale / stride) * stride)
+    return comfy_utils.common_upscale(
+        image[:, :, :, :3].movedim(-1, 1),
+        resized_width,
+        resized_height,
+        "area",
+        "disabled",
+    ).movedim(1, -1)
+
+
+def bernini_conditioning(
+    positive: Any,
+    negative: Any,
+    vae: _VaeEncoder,
+    width: int = 832,
+    height: int = 480,
+    length: int = 81,
+    batch_size: int = 1,
+    *,
+    source_video: Any | None = None,
+    reference_video: Any | None = None,
+    reference_images: Sequence[Any] | None = None,
+    ref_max_size: int = 848,
+) -> tuple[Any, Any, dict[str, Any]]:
+    """Build Bernini in-context WAN conditioning and an empty video latent.
+
+    Mirrors ComfyUI's ``BerniniConditioning`` node.  Context streams are VAE
+    encoded in this order: source video, reference video, then each reference
+    image.  When any context stream is present, the resulting latent list is
+    attached to both positive and negative conditioning as ``context_latents``.
+    """
+    torch, model_management, comfy_utils, node_helpers = _get_wan_conditioning_dependencies()
+
+    latent = torch.zeros(
+        [batch_size, 16, ((length - 1) // 4) + 1, height // 8, width // 8],
+        device=model_management.intermediate_device(),
+    )
+
+    context = []
+    if source_video is not None:
+        video = comfy_utils.common_upscale(
+            source_video[:length, :, :, :3].movedim(-1, 1),
+            width,
+            height,
+            "area",
+            "center",
+        ).movedim(1, -1)
+        context.append(vae.encode(video[:, :, :, :3]))
+
+    if reference_video is not None:
+        resized_reference_video = _resize_long_edge(reference_video[:length], ref_max_size)
+        context.append(vae.encode(resized_reference_video[:, :, :, :3]))
+
+    if reference_images:
+        for images in reference_images:
+            if images is None:
+                continue
+            for index in range(images.shape[0]):
+                image = _resize_long_edge(images[index : index + 1], ref_max_size)
+                context.append(vae.encode(image[:, :, :, :3]))
+
+    if context:
+        values = {"context_latents": context}
+        positive = node_helpers.conditioning_set_values(positive, values)
+        negative = node_helpers.conditioning_set_values(negative, values)
+
+    return positive, negative, {"samples": latent}
+
+
 def wan_first_last_frame_to_video(
     positive: Any,
     negative: Any,
@@ -2229,6 +2306,7 @@ __all__ = [
     "encode_prompt_flux",
     "encode_clip_vision",
     "wan_image_to_video",
+    "bernini_conditioning",
     "wan_first_last_frame_to_video",
     "wan_vace_to_video",
     "wan_fun_control_to_video",

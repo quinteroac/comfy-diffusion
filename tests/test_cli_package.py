@@ -44,7 +44,7 @@ def test_runtime_paths_prints_expected_keys(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["package_root"].endswith("comfy_diffusion")
     assert payload["models_dir"] == str(tmp_path.resolve())
-    assert payload["comfyui_pinned_tag"]
+    assert payload["comfyui_pinned_ref"]
     assert payload["comfyui_root"]
 
 

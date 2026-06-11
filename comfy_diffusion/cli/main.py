@@ -10,7 +10,7 @@ from typing import Annotated, Any
 import click
 import typer
 
-from comfy_diffusion._runtime import COMFYUI_PINNED_TAG, _comfyui_root
+from comfy_diffusion._runtime import COMFYUI_PINNED_REF, _comfyui_root
 from comfy_diffusion.downloader import (
     CivitAIModelEntry,
     HFModelEntry,
@@ -116,7 +116,7 @@ def runtime_paths(
         "package_root": str(_package_root()),
         "comfyui_root": str(_comfyui_root()),
         "models_dir": str(resolved_models_dir),
-        "comfyui_pinned_tag": COMFYUI_PINNED_TAG,
+        "comfyui_pinned_ref": COMFYUI_PINNED_REF,
     }
     if json_output:
         _echo_json(payload)

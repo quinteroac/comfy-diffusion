@@ -7,7 +7,7 @@
 - **Roadmap and node inventory:** [`ROADMAP.md`](ROADMAP.md) — full iteration plan, node classification (Roadmap / Nice-to-have / Discarded), and optional dependency schema.
 
 - **Key architecture decisions (do not revisit without explicit instruction):**
-  - ComfyUI is vendored at `vendor/ComfyUI` as a git submodule pinned to a stable release tag — never floating on `master`. Update the pin deliberately between iterations only.
+  - ComfyUI is vendored at `vendor/ComfyUI` as a git submodule pinned to an explicit ref (release tag or full commit SHA) — never floating implicitly. Update the pin deliberately between iterations only.
   - `sys.path` manipulation is encapsulated entirely inside `comfy_diffusion/_runtime.py` — consumers never touch paths manually. Use absolute paths derived from `__file__`.
   - The node system is loaded only through the explicit experimental `comfy_diffusion.nodes` escape hatch. Default node discovery may load ComfyUI core and built-in extra nodes; API nodes require opt-in; external custom nodes are loaded only from explicit trusted paths and are never discovered by scanning ComfyUI's default `custom_nodes` folder.
   - `torch` is an optional dependency declared as extras (`comfy-diffusion[cuda]` / `comfy-diffusion[cpu]`) — never hardcode a torch version or index URL in core dependencies.
