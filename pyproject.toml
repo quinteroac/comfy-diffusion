@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-diffusion"
-version = "2.4.0"
+version = "2.4.1"
 description = "ComfyUI inference engine as a standalone Python library (no server, no UI)."
 readme = "README.md"
 license = { text = "GPL-3.0-only" }
@@ -57,7 +57,7 @@ comfyui = [
     "aiohttp>=3.11.8",
     "blake3",
     "comfy-aimdo==0.3.0",
-    "comfy-kitchen>=0.2.8",
+    "comfy-kitchen>=0.2.10",
     "comfyui-embedded-docs==0.5.0",
     "comfyui-workflow-templates==0.9.75",
     "glfw>=2.10.0",
@@ -79,7 +79,7 @@ all = [
     "aiohttp>=3.11.8",
     "blake3",
     "comfy-aimdo==0.3.0",
-    "comfy-kitchen>=0.2.8",
+    "comfy-kitchen>=0.2.10",
     "comfyui-embedded-docs==0.5.0",
     "comfyui-workflow-templates==0.9.75",
     "glfw>=2.10.0",

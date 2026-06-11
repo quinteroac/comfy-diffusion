@@ -14,9 +14,9 @@ This pipeline mirrors the ``video_wan2_2_14B_i2v.json`` reference workflow
 with all four ``ComfySwitchNode`` switches at their default value ``False``
 (no LoRA branch active).  In that configuration:
 
-- The low-noise UNet is used for **pass 1** (add_noise=True, steps 0→steps//2,
+- The high-noise UNet is used for **pass 1** (add_noise=True, steps 0→steps//2,
   return_with_leftover_noise=True).
-- The high-noise UNet is used for **pass 2** (add_noise=False,
+- The low-noise UNet is used for **pass 2** (add_noise=False,
   steps//2→steps, return_with_leftover_noise=False).
 
 Workflow data flow
@@ -28,9 +28,9 @@ Workflow data flow
 5. WanImageToVideo — builds I2V conditioning and initial latent from the
    start image
 6. Apply ModelSamplingSD3(shift=5) to both UNets
-7. KSamplerAdvanced pass 1 — low-noise model: add_noise=True,
+7. KSamplerAdvanced pass 1 — high-noise model: add_noise=True,
    start_at_step=0, end_at_step=steps//2, return_with_leftover_noise=True
-8. KSamplerAdvanced pass 2 — high-noise model: add_noise=False,
+8. KSamplerAdvanced pass 2 — low-noise model: add_noise=False,
    start_at_step=steps//2, end_at_step=steps, return_with_leftover_noise=False
 9. VAEDecode → PIL frames
 
@@ -176,7 +176,7 @@ def run(
     ``video_wan2_2_14B_i2v.json`` reference workflow with all
     ``ComfySwitchNode`` switches at their default value ``False`` (no LoRA).
 
-    The low-noise UNet handles pass 1 (steps 0→steps//2) and the high-noise
+    The high-noise UNet handles pass 1 (steps 0→steps//2) and the low-noise
     UNet handles pass 2 (steps//2→steps), each with ``ModelSamplingSD3``
     (shift=5) applied.
 
@@ -277,27 +277,11 @@ def run(
         start_image=start_image,
     )
 
-    # Compute step split: low-noise handles [0, low_steps), high-noise handles [low_steps, steps).
-    low_steps = steps // 2
+    # Compute step split: high-noise handles [0, split_step), low-noise handles
+    # [split_step, steps).
+    split_step = steps // 2
 
-    # Pass 1 — low-noise model: add_noise=True, return_with_leftover_noise=True.
-    latent = sample_advanced(
-        model_low,
-        positive,
-        negative,
-        latent,
-        steps=steps,
-        cfg=cfg,
-        sampler_name="euler",
-        scheduler="simple",
-        noise_seed=seed,
-        add_noise=True,
-        start_at_step=0,
-        end_at_step=low_steps,
-        return_with_leftover_noise=True,
-    )
-
-    # Pass 2 — high-noise model: add_noise=False, return_with_leftover_noise=False.
+    # Pass 1 — high-noise model: add_noise=True, return_with_leftover_noise=True.
     latent = sample_advanced(
         model_high,
         positive,
@@ -308,8 +292,25 @@ def run(
         sampler_name="euler",
         scheduler="simple",
         noise_seed=seed,
+        add_noise=True,
+        start_at_step=0,
+        end_at_step=split_step,
+        return_with_leftover_noise=True,
+    )
+
+    # Pass 2 — low-noise model: add_noise=False, return_with_leftover_noise=False.
+    latent = sample_advanced(
+        model_low,
+        positive,
+        negative,
+        latent,
+        steps=steps,
+        cfg=cfg,
+        sampler_name="euler",
+        scheduler="simple",
+        noise_seed=seed,
         add_noise=False,
-        start_at_step=low_steps,
+        start_at_step=split_step,
         end_at_step=steps,
         return_with_leftover_noise=False,
     )

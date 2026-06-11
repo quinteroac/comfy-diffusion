@@ -365,7 +365,7 @@ wheels = [
 
 [[package]]
 name = "comfy-diffusion"
-version = "2.4.0"
+version = "2.4.1"
 source = { editable = "." }
 dependencies = [
     { name = "einops" },
@@ -450,8 +450,8 @@ requires-dist = [
     { name = "blake3", marker = "extra == 'comfyui'" },
     { name = "comfy-aimdo", marker = "extra == 'all'", specifier = "==0.3.0" },
     { name = "comfy-aimdo", marker = "extra == 'comfyui'", specifier = "==0.3.0" },
-    { name = "comfy-kitchen", marker = "extra == 'all'", specifier = ">=0.2.8" },
-    { name = "comfy-kitchen", marker = "extra == 'comfyui'", specifier = ">=0.2.8" },
+    { name = "comfy-kitchen", marker = "extra == 'all'", specifier = ">=0.2.10" },
+    { name = "comfy-kitchen", marker = "extra == 'comfyui'", specifier = ">=0.2.10" },
     { name = "comfyui-embedded-docs", marker = "extra == 'all'", specifier = "==0.5.0" },
     { name = "comfyui-embedded-docs", marker = "extra == 'comfyui'", specifier = "==0.5.0" },
     { name = "comfyui-workflow-templates", marker = "extra == 'all'", specifier = "==0.9.75" },
@@ -521,13 +521,13 @@ dev = [
 
 [[package]]
 name = "comfy-kitchen"
-version = "0.2.8"
+version = "0.2.10"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/f1/1206bc530adef9193ba78964d687b6f0381a853abee04cf6fa483bd082a0/comfy_kitchen-0.2.8-cp312-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0c2eb7d03921a70e21fd9bb43d557e09b20bec81479cb85c2b58e8cdfb2cacc9", size = 791523, upload-time = "2026-03-12T04:07:47.083Z" },
-    { url = "https://files.pythonhosted.org/packages/9a/af/e87ebae2b1bba35291663b0d6eea6748b340d7c21802224cfb37f3a48dda/comfy_kitchen-0.2.8-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:570b2eb74c77ce9356b0140ec190253dcbedeb1e92bec5092444abef9cd24ebf", size = 794595, upload-time = "2026-03-12T04:07:48.443Z" },
-    { url = "https://files.pythonhosted.org/packages/84/5c/14cb27952313dca93e3e8a58223fd6297acd701df3d9727c007edbcb3559/comfy_kitchen-0.2.8-cp312-abi3-win_amd64.whl", hash = "sha256:20b94aa87e6d42181ad928560487a0e2a692dfcc9fce40d4e31f8fc57753865c", size = 677964, upload-time = "2026-03-12T04:07:49.719Z" },
-    { url = "https://files.pythonhosted.org/packages/46/b0/64c3e0656db822cb4f7dbc928d6a13cf2cad861cc178e6386114634e355b/comfy_kitchen-0.2.8-py3-none-any.whl", hash = "sha256:0b322992cf1681ebe3d413ac7950f39e5cc425505c13cef8d08527ce82fe5e32", size = 64854, upload-time = "2026-03-12T04:07:51.051Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/4d/7416b070a0957aeb4551068306484610789c1af8bcbf2fe140a03b702e88/comfy_kitchen-0.2.10-cp312-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b945da25740a3f51e3c1c1292dc1b2f37350d7f37b1e1c73d988f33acc0aa249", size = 3727059, upload-time = "2026-05-30T04:47:40.082Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/b9/4d4efa9e5f5ec4296cfce426dbd211642685141d9a52f6b5f037fcef0e6e/comfy_kitchen-0.2.10-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:54a64bf4dddf05ad69f5eef73d72caa328a331b798a41997559a5158e616d87f", size = 3734494, upload-time = "2026-05-30T04:47:41.518Z" },
+    { url = "https://files.pythonhosted.org/packages/00/6b/75f744abcacb17ef24d61e96fee6147d2288aaa4a165cf87ad543548a37d/comfy_kitchen-0.2.10-cp312-abi3-win_amd64.whl", hash = "sha256:fe6b1789dc7a673c0f9091d693c6a1013a693c988e3dfb68dc429b4bd6d81050", size = 2525530, upload-time = "2026-05-30T04:47:42.809Z" },
+    { url = "https://files.pythonhosted.org/packages/40/a9/45869a10ead662992bd35374536e056b7ec019c6851e11e23228dc675031/comfy_kitchen-0.2.10-py3-none-any.whl", hash = "sha256:c242afd18d120e28fc949c423fa28cbb22cb4d70d627d8cc7cdf6bad54dd272c", size = 89054, upload-time = "2026-05-30T04:47:44.077Z" },
 ]
 
 [[package]]

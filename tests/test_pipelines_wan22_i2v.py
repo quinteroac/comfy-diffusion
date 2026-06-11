@@ -9,7 +9,7 @@ Covers:
   - run() signature: image, prompt, negative_prompt, width, height, length,
     *, models_dir, seed, steps, cfg
   - run() behaviour: WanImageToVideo conditioning followed by dual two-pass
-    KSamplerAdvanced (low-noise first, high-noise second) with ModelSamplingSD3
+    KSamplerAdvanced (high-noise first, low-noise second) with ModelSamplingSD3
     shift=5 applied; no LoRA (switch=False default)
   - run() raises RuntimeError when check_runtime returns an error
   - wan22 sub-package exports i2v
@@ -404,6 +404,48 @@ def test_run_calls_sample_advanced_twice(tmp_path: Path) -> None:
     _run_with_mocks(tmp_path, call_order=call_order)
     sa_calls = [c for c in call_order if c.startswith("sample_advanced")]
     assert len(sa_calls) == 2, f"sample_advanced must be called twice, got {sa_calls}"
+
+
+def test_run_samples_high_noise_before_low_noise(tmp_path: Path) -> None:
+    """First sampler pass must use high-noise; second pass must use low-noise."""
+    from comfy_diffusion.pipelines.video.wan.wan22 import i2v as pipeline_mod
+
+    fake_image = MagicMock(name="pil_image")
+    model_high = MagicMock(name="model_high")
+    model_low = MagicMock(name="model_low")
+    patched_high = MagicMock(name="patched_high")
+    patched_low = MagicMock(name="patched_low")
+    mm = _build_mock_mm()
+    mm.load_unet.side_effect = [model_high, model_low]
+
+    sampled_models: list[Any] = []
+
+    def capture_sd3(model: Any, shift: float) -> Any:
+        if model is model_high:
+            return patched_high
+        if model is model_low:
+            return patched_low
+        raise AssertionError(f"Unexpected model passed to model_sampling_sd3: {model!r}")
+
+    def capture_sample_advanced(
+        model: Any, pos: Any, neg: Any, lat: Any, **kwargs: Any
+    ) -> Any:
+        sampled_models.append(model)
+        return MagicMock(name="sampled")
+
+    with (
+        patch(_RUNTIME_PATCH, return_value={"python_version": "3.12.0"}),
+        patch(_MM_PATCH, return_value=mm),
+        patch(_ENCODE_PATCH, return_value=(MagicMock(), MagicMock())),
+        patch(_IMAGE_TO_TENSOR_PATCH, return_value=MagicMock()),
+        patch(_WAN_I2V_PATCH, return_value=(MagicMock(), MagicMock(), MagicMock())),
+        patch(_MODEL_SAMPLING_SD3_PATCH, side_effect=capture_sd3),
+        patch(_SAMPLE_ADVANCED_PATCH, side_effect=capture_sample_advanced),
+        patch(_VAE_DECODE_BATCH_PATCH, return_value=[]),
+    ):
+        pipeline_mod.run(fake_image, "test prompt", models_dir=tmp_path)
+
+    assert sampled_models == [patched_high, patched_low]
 
 
 def test_run_calls_vae_decode_batch(tmp_path: Path) -> None:
