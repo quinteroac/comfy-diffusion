@@ -105,6 +105,58 @@ def _coerce_reference_images(reference_images: Any, image_to_tensor: Any) -> lis
     return coerced or None
 
 
+def _reference_images_to_autogrow(reference_images: list[Any] | None) -> dict[str, Any] | None:
+    if not reference_images:
+        return None
+    return {f"reference_image_{index}": image for index, image in enumerate(reference_images)}
+
+
+def _unwrap_bernini_output(output: Any) -> tuple[Any, Any, dict[str, Any]]:
+    result = getattr(output, "result", output)
+    if not isinstance(result, (tuple, list)) or len(result) != 3:
+        raise RuntimeError("BerniniConditioning returned an unexpected output shape")
+    return result[0], result[1], result[2]
+
+
+def _run_bernini_conditioning(
+    positive: Any,
+    negative: Any,
+    vae: Any,
+    *,
+    width: int,
+    height: int,
+    length: int,
+    batch_size: int,
+    source_video: Any | None,
+    reference_images: list[Any] | None,
+    ref_max_size: int,
+) -> tuple[Any, Any, dict[str, Any]]:
+    from comfy_diffusion._runtime import ensure_comfyui_on_path
+
+    ensure_comfyui_on_path()
+    try:
+        from comfy_extras.nodes_bernini import BerniniConditioning
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise RuntimeError(
+            "Vendored ComfyUI does not include BerniniConditioning; "
+            "update the ComfyUI pin to a Bernini-capable nightly build."
+        ) from exc
+
+    output = BerniniConditioning.execute(
+        positive,
+        negative,
+        vae,
+        width,
+        height,
+        length,
+        batch_size,
+        source_video=source_video,
+        reference_images=_reference_images_to_autogrow(reference_images),
+        ref_max_size=ref_max_size,
+    )
+    return _unwrap_bernini_output(output)
+
+
 def run(
     source_video: Any | None = None,
     reference_image: Any | None = None,
@@ -139,7 +191,7 @@ def run(
     omitted when a source video is present, a single PIL/BHWC image, or a list
     of PIL/BHWC images for multi-reference conditioning.
     """
-    from comfy_diffusion.conditioning import bernini_conditioning, encode_prompt
+    from comfy_diffusion.conditioning import encode_prompt
     from comfy_diffusion.image import image_to_tensor
     from comfy_diffusion.lora import apply_lora
     from comfy_diffusion.models import ModelManager
@@ -182,7 +234,7 @@ def run(
 
     positive, negative = encode_prompt(clip, prompt, negative_prompt)
 
-    positive, negative, latent = bernini_conditioning(
+    positive, negative, latent = _run_bernini_conditioning(
         positive,
         negative,
         vae,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import inspect
+import sys
+import types
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -22,7 +24,9 @@ _RUNTIME_PATCH = "comfy_diffusion.runtime.check_runtime"
 _MM_PATCH = "comfy_diffusion.models.ModelManager"
 _APPLY_LORA_PATCH = "comfy_diffusion.lora.apply_lora"
 _ENCODE_PATCH = "comfy_diffusion.conditioning.encode_prompt"
-_BERNINI_CONDITIONING_PATCH = "comfy_diffusion.conditioning.bernini_conditioning"
+_BERNINI_CONDITIONING_PATCH = (
+    "comfy_diffusion.pipelines.video.wan.wan22.bernini._run_bernini_conditioning"
+)
 _IMAGE_TO_TENSOR_PATCH = "comfy_diffusion.image.image_to_tensor"
 _GET_SAMPLER_PATCH = "comfy_diffusion.sampling.get_sampler"
 _BASIC_SCHEDULER_PATCH = "comfy_diffusion.sampling.basic_scheduler"
@@ -101,6 +105,48 @@ def test_run_signature_defaults_match_workflow() -> None:
     assert sig.parameters["sampler_name"].default == "res_multistep"
     assert sig.parameters["scheduler"].default == "simple"
     assert sig.parameters["ref_max_size"].default == 848
+
+
+def test_bernini_conditioning_uses_vendored_node_autogrow(monkeypatch: object) -> None:
+    from comfy_diffusion.pipelines.video.wan.wan22.bernini import _run_bernini_conditioning
+
+    class FakeNodeOutput:
+        def __init__(self, *values: object) -> None:
+            self.result = values
+
+    class FakeBerniniConditioning:
+        call_kwargs: dict[str, object]
+
+        @classmethod
+        def execute(cls, *args: object, **kwargs: object) -> FakeNodeOutput:
+            cls.call_kwargs = kwargs
+            return FakeNodeOutput("bernini_positive", "bernini_negative", {"samples": "latent"})
+
+    fake_module = types.SimpleNamespace(BerniniConditioning=FakeBerniniConditioning)
+    monkeypatch.setitem(sys.modules, "comfy_extras.nodes_bernini", fake_module)
+
+    reference_one = object()
+    reference_two = object()
+    result = _run_bernini_conditioning(
+        "positive",
+        "negative",
+        "vae",
+        width=832,
+        height=480,
+        length=81,
+        batch_size=1,
+        source_video="source",
+        reference_images=[reference_one, reference_two],
+        ref_max_size=848,
+    )
+
+    assert result == ("bernini_positive", "bernini_negative", {"samples": "latent"})
+    assert FakeBerniniConditioning.call_kwargs["source_video"] == "source"
+    assert FakeBerniniConditioning.call_kwargs["reference_images"] == {
+        "reference_image_0": reference_one,
+        "reference_image_1": reference_two,
+    }
+    assert FakeBerniniConditioning.call_kwargs["ref_max_size"] == 848
 
 
 def test_run_wires_bernini_workflow() -> None:

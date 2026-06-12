@@ -13,7 +13,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-COMFYUI_PINNED_REF = "fb991e2c1e7476809d566a4620c2132e05a466dd"
+COMFYUI_PINNED_REF = "822aca19836cd75c815631db23c3ad742d1f7d5e"
 COMFYUI_PINNED_ARCHIVE_URL = (
     "https://github.com/Comfy-Org/ComfyUI/archive/"
     f"{COMFYUI_PINNED_REF}.zip"
