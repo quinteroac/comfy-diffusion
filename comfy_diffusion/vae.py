@@ -86,7 +86,15 @@ def _non_inplace_vae_output(vae: Any) -> Iterator[None]:
     original = getattr(vae, "process_output", None)
     if original is not None:
         def _process_output(image: Any) -> Any:
-            return (image + 1.0).div(2.0).clamp(0.0, 1.0)
+            output = (image + 1.0).div(2.0).clamp(0.0, 1.0)
+            try:
+                import torch
+            except ModuleNotFoundError:
+                torch = None
+            if torch is not None and isinstance(image, torch.Tensor):
+                image.copy_(output)
+                return image
+            return output
 
         vae.process_output = _process_output
 

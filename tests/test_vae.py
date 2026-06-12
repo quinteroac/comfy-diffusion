@@ -185,6 +185,28 @@ def test_vae_decode_accepts_checkpoint_result_vae_and_returns_pil_image() -> Non
     assert calls == [samples]
 
 
+def test_vae_decode_batch_preserves_comfyui_inplace_output_normalization() -> None:
+    torch = pytest.importorskip("torch")
+    samples = torch.zeros((1, 4, 1, 1), dtype=torch.float32)
+
+    class _FakeVae:
+        process_output = lambda self, image: image.add_(1.0).div_(2.0).clamp_(0.0, 1.0)
+
+        def decode(self, value: object) -> object:
+            assert value.shape == samples.shape
+            pixel_samples = torch.tensor(
+                [[[[-1.0, 0.0, 1.0], [1.0, 0.0, -1.0]]]],
+                dtype=torch.float32,
+            )
+            self.process_output(pixel_samples[0:1])
+            return pixel_samples
+
+    frames = vae_decode_batch(_FakeVae(), {"samples": samples})
+
+    assert [frame.getpixel((0, 0)) for frame in frames] == [(0, 127, 255)]
+    assert [frame.getpixel((1, 0)) for frame in frames] == [(255, 127, 0)]
+
+
 def test_vae_decode_tiled_with_default_parameters_returns_pil_image() -> None:
     samples = _FakeTensor([[[[0.0, 0.0, 0.0]]]])
     decoded = _FakeTensor([[[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]])
