@@ -18,6 +18,7 @@ COMFYUI_PINNED_ARCHIVE_URL = (
     "https://github.com/Comfy-Org/ComfyUI/archive/"
     f"{COMFYUI_PINNED_REF}.zip"
 )
+COMFYUI_PINNED_REF_MARKER = ".comfy-diffusion-comfyui-ref"
 
 
 def _comfyui_root() -> Path:
@@ -37,6 +38,26 @@ def _comfyui_root() -> Path:
 def _has_comfyui_runtime(comfyui_root: Path) -> bool:
     """Return True if the ComfyUI runtime directory looks initialized."""
     return comfyui_root.is_dir() and (comfyui_root / "comfy").is_dir()
+
+
+def _is_download_managed_runtime(comfyui_root: Path) -> bool:
+    """Return True when this runtime lives inside the installed package tree."""
+    package_dir = Path(__file__).resolve().parent
+    return comfyui_root == package_dir / "vendor" / "ComfyUI"
+
+
+def _has_pinned_comfyui_runtime(comfyui_root: Path) -> bool:
+    """Return True if a downloaded ComfyUI runtime matches the pinned ref."""
+    if not _has_comfyui_runtime(comfyui_root):
+        return False
+    if not _is_download_managed_runtime(comfyui_root):
+        return True
+
+    marker = comfyui_root / COMFYUI_PINNED_REF_MARKER
+    try:
+        return marker.read_text(encoding="utf-8").strip() == COMFYUI_PINNED_REF
+    except OSError:
+        return False
 
 
 def _download_and_extract_pinned_comfyui(comfyui_root: Path) -> None:
@@ -64,13 +85,16 @@ def _download_and_extract_pinned_comfyui(comfyui_root: Path) -> None:
 
     if not _has_comfyui_runtime(comfyui_root):
         raise RuntimeError("ComfyUI runtime download completed but content is invalid.")
+    (comfyui_root / COMFYUI_PINNED_REF_MARKER).write_text(
+        f"{COMFYUI_PINNED_REF}\n", encoding="utf-8"
+    )
 
 
 def ensure_comfyui_available() -> Path:
     """Ensure vendored ComfyUI exists; download pinned ref if missing."""
     comfyui_root = _comfyui_root()
 
-    if not _has_comfyui_runtime(comfyui_root):
+    if not _has_pinned_comfyui_runtime(comfyui_root):
         _download_and_extract_pinned_comfyui(comfyui_root)
 
     return comfyui_root

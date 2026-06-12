@@ -98,6 +98,54 @@ def test_ensure_comfyui_available_skips_download_when_runtime_is_present(
     assert download_called["value"] is False
 
 
+def test_ensure_comfyui_available_redownloads_managed_runtime_without_pin_marker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    comfyui_root = tmp_path / "comfy_diffusion" / "vendor" / "ComfyUI"
+    (comfyui_root / "comfy").mkdir(parents=True)
+    (comfyui_root / "comfy" / "__init__.py").write_text("", encoding="utf-8")
+    downloads: list[Path] = []
+
+    def fake_download(target: Path) -> None:
+        downloads.append(target)
+        (target / "comfy").mkdir(parents=True, exist_ok=True)
+        (target / "comfy" / "__init__.py").write_text("", encoding="utf-8")
+        (target / _runtime.COMFYUI_PINNED_REF_MARKER).write_text(
+            f"{_runtime.COMFYUI_PINNED_REF}\n", encoding="utf-8"
+        )
+
+    monkeypatch.setattr(_runtime, "_comfyui_root", lambda: comfyui_root)
+    monkeypatch.setattr(_runtime, "_is_download_managed_runtime", lambda _root: True)
+    monkeypatch.setattr(_runtime, "_download_and_extract_pinned_comfyui", fake_download)
+
+    result = _runtime.ensure_comfyui_available()
+
+    assert result == comfyui_root
+    assert downloads == [comfyui_root]
+
+
+def test_ensure_comfyui_available_skips_managed_runtime_with_matching_pin_marker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    comfyui_root = tmp_path / "comfy_diffusion" / "vendor" / "ComfyUI"
+    (comfyui_root / "comfy").mkdir(parents=True)
+    (comfyui_root / "comfy" / "__init__.py").write_text("", encoding="utf-8")
+    (comfyui_root / _runtime.COMFYUI_PINNED_REF_MARKER).write_text(
+        f"{_runtime.COMFYUI_PINNED_REF}\n", encoding="utf-8"
+    )
+
+    def fake_download(target: Path) -> None:
+        raise AssertionError(f"unexpected download for {target}")
+
+    monkeypatch.setattr(_runtime, "_comfyui_root", lambda: comfyui_root)
+    monkeypatch.setattr(_runtime, "_is_download_managed_runtime", lambda _root: True)
+    monkeypatch.setattr(_runtime, "_download_and_extract_pinned_comfyui", fake_download)
+
+    result = _runtime.ensure_comfyui_available()
+
+    assert result == comfyui_root
+
+
 def test_ensure_comfyui_available_downloads_and_extracts_when_runtime_is_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -136,6 +184,9 @@ def test_ensure_comfyui_available_downloads_and_extracts_when_runtime_is_missing
     assert result == comfyui_root
     assert comfyui_root.is_dir()
     assert (comfyui_root / "comfy").is_dir()
+    assert (comfyui_root / _runtime.COMFYUI_PINNED_REF_MARKER).read_text(
+        encoding="utf-8"
+    ).strip() == _runtime.COMFYUI_PINNED_REF
     assert observed_url["value"] == _runtime.COMFYUI_PINNED_ARCHIVE_URL
     assert _runtime.COMFYUI_PINNED_REF in observed_url["value"]
     assert "value" in extracted_into
