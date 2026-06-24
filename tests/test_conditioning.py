@@ -14,6 +14,7 @@ import pytest
 
 import comfy_diffusion.conditioning as conditioning
 from comfy_diffusion.conditioning import (
+    KREA2_REBALANCE_DEFAULT_WEIGHTS,
     bernini_conditioning,
     conditioning_combine,
     conditioning_set_mask,
@@ -25,6 +26,7 @@ from comfy_diffusion.conditioning import (
     ltxv_conditioning,
     ltxv_crop_guides,
     ltxv_img_to_video,
+    rebalance_krea2_conditioning,
     reference_latent,
     wan_first_last_frame_to_video,
     wan_image_to_video,
@@ -177,6 +179,76 @@ def test_encode_prompt_accepts_empty_string_without_crashing() -> None:
     assert clip.tokenize_calls == [" "]
 
 
+def test_rebalance_krea2_conditioning_scales_conditioning_entries() -> None:
+    torch = pytest.importorskip("torch")
+
+    tensor = torch.ones((1, 2, 4))
+    pooled = torch.ones((1, 4))
+    conditioning_input = [[tensor, {"pooled_output": pooled, "label": "kept"}]]
+
+    output = rebalance_krea2_conditioning(
+        conditioning_input,
+        multiplier=2.0,
+        per_layer_weights=None,
+    )
+
+    assert torch.equal(output[0][0], tensor * 2.0)
+    assert output[0][1]["pooled_output"] is pooled
+    assert output[0][1]["label"] == "kept"
+    assert output[0][1] is not conditioning_input[0][1]
+
+
+def test_rebalance_krea2_conditioning_applies_per_layer_weights() -> None:
+    torch = pytest.importorskip("torch")
+
+    tensor = torch.ones((1, 1, 24))
+    weights = tuple(float(index + 1) for index in range(12))
+
+    output = rebalance_krea2_conditioning(
+        [[tensor, {}]],
+        multiplier=0.5,
+        per_layer_weights=weights,
+    )
+
+    expected_layers = torch.tensor(weights).reshape(1, 1, 12, 1).expand(1, 1, 12, 2)
+    expected = expected_layers.reshape(1, 1, 24) * 0.5
+    assert torch.equal(output[0][0], expected)
+
+
+def test_rebalance_krea2_conditioning_recurses_dicts_and_preserves_non_tensors() -> None:
+    torch = pytest.importorskip("torch")
+
+    nested_tensor = torch.ones((1, 12))
+    structure = {
+        "conditioning": [[torch.ones((1, 1, 12)), {"mask": nested_tensor}]],
+        "name": "krea2",
+    }
+
+    output = rebalance_krea2_conditioning(
+        structure,
+        multiplier=3.0,
+        per_layer_weights="",
+    )
+
+    assert torch.equal(output["conditioning"][0][0], torch.ones((1, 1, 12)) * 3.0)
+    assert output["conditioning"][0][1]["mask"] is nested_tensor
+    assert output["name"] == "krea2"
+
+
+def test_rebalance_krea2_conditioning_invalid_per_layer_weights_fall_back() -> None:
+    torch = pytest.importorskip("torch")
+
+    tensor = torch.ones((1, 1, len(KREA2_REBALANCE_DEFAULT_WEIGHTS)))
+
+    output = rebalance_krea2_conditioning(
+        [[tensor, {}]],
+        multiplier=2.0,
+        per_layer_weights="not,a,float",
+    )
+
+    assert torch.equal(output[0][0], tensor * 2.0)
+
+
 def test_encode_prompt_flux_imports_without_models_on_cpu() -> None:
     result = _run_python(
         "from comfy_diffusion.conditioning import encode_prompt_flux; "
@@ -311,6 +383,8 @@ def test_conditioning_public_api_exports_expected_entrypoints() -> None:
         "void_inpaint_conditioning",
         "ltx_add_video_ic_lora_guide",
         "conditioning_zero_out",
+        "KREA2_REBALANCE_DEFAULT_WEIGHTS",
+        "rebalance_krea2_conditioning",
         "conditioning_combine",
         "conditioning_set_mask",
         "conditioning_set_timestep_range",

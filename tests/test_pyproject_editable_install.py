@@ -97,7 +97,7 @@ def test_video_optional_dependencies_are_declared_in_video_extra() -> None:
 
     assert "video" in optional
     assert optional["video"] == [
-        "av>=14.2.0",
+        "av>=16.0.0",
         "imageio>=2.37.2",
         "opencv-python>=4.13.0.92",
     ]

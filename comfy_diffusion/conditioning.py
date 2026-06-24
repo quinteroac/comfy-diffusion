@@ -800,6 +800,123 @@ def conditioning_zero_out(conditioning: Any) -> list[Any]:
     return result
 
 
+KREA2_REBALANCE_DEFAULT_WEIGHTS: tuple[float, ...] = (
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    2.5,
+    5.0,
+    1.1,
+    4.0,
+    1.0,
+)
+
+
+def _parse_krea2_per_layer_weights(per_layer_weights: Any) -> tuple[float, ...] | None:
+    if per_layer_weights is None:
+        return None
+    if isinstance(per_layer_weights, str):
+        text = per_layer_weights.strip()
+        if not text:
+            return None
+        try:
+            values = tuple(
+                float(item)
+                for item in text.replace(";", ",").split(",")
+                if item.strip() != ""
+            )
+        except ValueError:
+            return None
+        return values if len(values) >= 2 else None
+    try:
+        values = tuple(float(item) for item in per_layer_weights)
+    except (TypeError, ValueError):
+        return None
+    return values if len(values) >= 2 else None
+
+
+def _scale_krea2_conditioning_tensor(
+    tensor: Any,
+    multiplier: float,
+    per_layer_weights: tuple[float, ...] | None,
+) -> Any:
+    if per_layer_weights is None:
+        return tensor * multiplier
+
+    flat_dim = tensor.shape[-1]
+    layer_count = len(per_layer_weights)
+    if layer_count <= 1 or flat_dim % layer_count != 0:
+        return tensor * multiplier
+
+    import torch
+
+    layer_dim = flat_dim // layer_count
+    original_dtype = tensor.dtype
+    scaled = tensor.float()
+    scaled = scaled.view(*scaled.shape[:-1], layer_count, layer_dim)
+    gains = torch.tensor(per_layer_weights, dtype=scaled.dtype, device=scaled.device)
+    scaled = scaled * gains.view(*([1] * (scaled.dim() - 2)), layer_count, 1)
+    scaled = scaled.view(*scaled.shape[:-2], flat_dim)
+    return scaled.to(original_dtype) * multiplier
+
+
+def rebalance_krea2_conditioning(
+    conditioning: Any,
+    multiplier: float = 4.0,
+    per_layer_weights: Any = KREA2_REBALANCE_DEFAULT_WEIGHTS,
+) -> Any:
+    """Scale Krea2 conditioning with optional per-layer Qwen3-VL tap weights.
+
+    Krea2 text conditioning is flattened from 12 Qwen3-VL hidden-state taps as
+    ``(B, seq, 12 * dim)``.  When valid per-layer weights are supplied, tensors
+    whose final dimension is divisible by the number of weights are temporarily
+    reshaped to apply one gain per tap before flattening back.  Metadata such as
+    pooled outputs, masks, and non-tensor values is preserved.
+    """
+    import torch
+
+    parsed_weights = _parse_krea2_per_layer_weights(per_layer_weights)
+
+    def _scale(structure: Any) -> Any:
+        if isinstance(structure, list):
+            output = []
+            for item in structure:
+                if (
+                    isinstance(item, (list, tuple))
+                    and len(item) == 2
+                    and isinstance(item[0], torch.Tensor)
+                    and isinstance(item[1], dict)
+                ):
+                    output.append(
+                        [
+                            _scale_krea2_conditioning_tensor(
+                                item[0],
+                                multiplier,
+                                parsed_weights,
+                            ),
+                            dict(item[1]),
+                        ]
+                    )
+                else:
+                    output.append(_scale(item))
+            return output
+        if isinstance(structure, torch.Tensor):
+            return _scale_krea2_conditioning_tensor(
+                structure,
+                multiplier,
+                parsed_weights,
+            )
+        if isinstance(structure, dict):
+            return {key: _scale(value) for key, value in structure.items()}
+        return structure
+
+    return _scale(conditioning)
+
+
 def conditioning_combine(
     cond_a: Any,
     cond_b: Any | None = None,
@@ -2330,6 +2447,8 @@ __all__ = [
     "void_inpaint_conditioning",
     "ltx_add_video_ic_lora_guide",
     "conditioning_zero_out",
+    "KREA2_REBALANCE_DEFAULT_WEIGHTS",
+    "rebalance_krea2_conditioning",
     "conditioning_combine",
     "conditioning_set_mask",
     "conditioning_set_timestep_range",
