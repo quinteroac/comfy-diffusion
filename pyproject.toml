@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-diffusion"
-version = "2.4.5"
+version = "2.5.0"
 description = "ComfyUI inference engine as a standalone Python library (no server, no UI)."
 readme = "README.md"
 license = { text = "GPL-3.0-only" }
@@ -56,9 +56,10 @@ video = [
 comfyui = [
     "aiohttp>=3.11.8",
     "alembic",
+    "av>=16.0.0",
     "blake3",
     "comfy-aimdo==0.4.10",
-    "comfy-kitchen>=0.2.10",
+    "comfy-kitchen>=0.2.18",
     "comfyui-embedded-docs==0.5.5",
     "comfyui-workflow-templates==0.10.3",
     "filelock",
@@ -72,6 +73,7 @@ comfyui = [
     "SQLAlchemy>=2.0.0",
     "spandrel>=0.4.2",
     "torchsde>=0.2.6",
+    "torchaudio",
 ]
 all = [
     "torch",
@@ -84,7 +86,7 @@ all = [
     "alembic",
     "blake3",
     "comfy-aimdo==0.4.10",
-    "comfy-kitchen>=0.2.10",
+    "comfy-kitchen>=0.2.18",
     "comfyui-embedded-docs==0.5.5",
     "comfyui-workflow-templates==0.10.3",
     "filelock",
