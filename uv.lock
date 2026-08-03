@@ -379,7 +379,7 @@ wheels = [
 
 [[package]]
 name = "comfy-diffusion"
-version = "2.5.0"
+version = "2.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "einops" },
@@ -476,8 +476,8 @@ requires-dist = [
     { name = "blake3", marker = "extra == 'comfyui'" },
     { name = "comfy-aimdo", marker = "extra == 'all'", specifier = "==0.4.10" },
     { name = "comfy-aimdo", marker = "extra == 'comfyui'", specifier = "==0.4.10" },
-    { name = "comfy-kitchen", marker = "extra == 'all'", specifier = ">=0.2.18" },
-    { name = "comfy-kitchen", marker = "extra == 'comfyui'", specifier = ">=0.2.18" },
+    { name = "comfy-kitchen", marker = "extra == 'all'", specifier = ">=0.2.26" },
+    { name = "comfy-kitchen", marker = "extra == 'comfyui'", specifier = ">=0.2.26" },
     { name = "comfyui-embedded-docs", marker = "extra == 'all'", specifier = "==0.5.5" },
     { name = "comfyui-embedded-docs", marker = "extra == 'comfyui'", specifier = "==0.5.5" },
     { name = "comfyui-workflow-templates", marker = "extra == 'all'", specifier = "==0.10.3" },
