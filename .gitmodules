@@ -1,4 +1,4 @@
-# Pinned ComfyUI ref: 92ddf07ba14711cb579ab090846e0d51289c0619 (master as of 2026-07-10)
+# Pinned ComfyUI ref: 14b05228cef127ce529bc0c08660770d4af3e9a8 (master as of 2026-08-02)
 [submodule "vendor/ComfyUI"]
 	path = vendor/ComfyUI
 	url = https://github.com/Comfy-Org/ComfyUI.git

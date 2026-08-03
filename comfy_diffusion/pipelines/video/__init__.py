@@ -8,4 +8,4 @@ Import directly from the specific pipeline module, e.g.::
     from comfy_diffusion.pipelines.video.ltx.ltx2.t2v import manifest, run
 """
 
-__all__ = ["ltx", "wan"]
+__all__ = ["ltx", "minimax", "wan"]

@@ -8,7 +8,7 @@ from pathlib import Path
 
 SUBMODULE_NAME = "vendor/ComfyUI"
 SUBMODULE_URL = "https://github.com/Comfy-Org/ComfyUI.git"
-PINNED_REF = "92ddf07ba14711cb579ab090846e0d51289c0619"
+PINNED_REF = "14b05228cef127ce529bc0c08660770d4af3e9a8"
 
 
 def _repo_root() -> Path:

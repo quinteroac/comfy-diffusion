@@ -198,6 +198,84 @@ def save_video(frames: Any, path: str | Path, fps: float) -> None:
         writer.close()
 
 
+def save_video_with_audio(
+    frames: Any,
+    audio: dict[str, Any],
+    path: str | Path,
+    fps: float,
+) -> None:
+    """Save frames and a ComfyUI AUDIO dict as one muxed video file.
+
+    This uses the existing video writer for the video stream and the ``ffmpeg``
+    executable for final audio muxing. It is intended for generated AV models
+    such as MiniMax H3 and LTXV. ``ffmpeg`` must be available on ``PATH``.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    import wave
+
+    import numpy as np
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("save_video_with_audio requires ffmpeg on PATH")
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    waveform = audio["waveform"]
+    if hasattr(waveform, "detach"):
+        waveform = waveform.detach().cpu()
+    waveform = np.asarray(waveform)
+    if waveform.ndim == 3:
+        waveform = waveform[0]
+    if waveform.ndim != 2:
+        raise ValueError("audio waveform must have shape [channels, samples]")
+    if waveform.shape[0] > 8 and waveform.shape[1] <= 8:
+        waveform = waveform.T
+
+    channels, samples = waveform.shape
+    waveform = np.clip(waveform, -1.0, 1.0)
+    interleaved = (waveform.T * 32767.0).astype(np.int16).tobytes()
+    sample_rate = int(audio["sample_rate"])
+
+    with tempfile.TemporaryDirectory(prefix="comfy-diffusion-av-") as tmp:
+        tmp_dir = Path(tmp)
+        video_only = tmp_dir / "video.mp4"
+        audio_only = tmp_dir / "audio.wav"
+        save_video(frames, video_only, fps)
+        with wave.open(str(audio_only), "wb") as wav:
+            wav.setnchannels(channels)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(interleaved)
+
+        subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_only),
+                "-i",
+                str(audio_only),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(output_path),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+
 def get_video_metadata(video_path: str | Path) -> dict[str, int | float]:
     """Return frame count, fps, width, and height for a video."""
     path = Path(video_path)
